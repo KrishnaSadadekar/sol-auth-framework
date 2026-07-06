@@ -1,0 +1,27 @@
+package sol.auth.common.enums;
+
+public enum AuditAction {
+
+    LOGIN,
+    LOGOUT,
+
+    USER_CREATED,
+    USER_UPDATED,
+    USER_DELETED,
+
+    PASSWORD_CHANGED,
+    PASSWORD_RESET,
+
+    ROLE_ASSIGNED,
+    ROLE_REMOVED,
+
+    PERMISSION_GRANTED,
+    PERMISSION_REVOKED,
+
+    ACCOUNT_LOCKED,
+    ACCOUNT_UNLOCKED,
+
+    TOKEN_GENERATED,
+    TOKEN_REFRESHED,
+    TOKEN_REVOKED
+}
