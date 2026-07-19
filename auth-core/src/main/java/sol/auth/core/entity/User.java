@@ -53,4 +53,14 @@ public class User extends BaseEntity {
 
     private LocalDateTime lastLogin;
 
+    public void setEnabled(boolean b) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'setEnabled'");
+    }
+
+    public void setFailedLoginAttempts(int i) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'setFailedLoginAttempts'");
+    }
+
 }

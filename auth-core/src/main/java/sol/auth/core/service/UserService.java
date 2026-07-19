@@ -12,4 +12,8 @@ public interface UserService {
 
     Optional<User> findByEmail(String email);
 
+    User create(User user);
+
+    Optional<User> findByLoginId(String loginId);
+
 }

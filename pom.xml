@@ -23,8 +23,8 @@
     <modules>
         <module>auth-common</module>
         <module>auth-core</module>
-        <!--<module>auth-security</module>
-        <module>auth-jwt</module>
+        <module>auth-security</module>
+        <!--<module>auth-jwt</module>
         <module>auth-autoconfigure</module>
         <module>auth-starter</module>
         <module>auth-service</module>

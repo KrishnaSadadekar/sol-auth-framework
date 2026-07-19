@@ -13,22 +13,25 @@ import sol.auth.core.exception.UserDisabledException;
 import sol.auth.core.repository.UserRepository;
 import sol.auth.core.service.AuthenticationService;
 import sol.auth.core.service.LoginAttemptService;
+import sol.auth.core.service.PasswordService;
 
 @Service
 public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final UserRepository userRepository;
-    PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    
+    private final PasswordService passwordService;
     private final LoginAttemptService loginAttemptService;
     private final AccountLockServiceImpl accountLockService;
 
     public AuthenticationServiceImpl(UserRepository userRepository,
             AccountLockServiceImpl accountLockService,
-
-            LoginAttemptService loginAttemptService) {
+            LoginAttemptService loginAttemptService,
+            PasswordService passwordService) {
         this.userRepository = userRepository;
         this.accountLockService = accountLockService;
         this.loginAttemptService = loginAttemptService;
+        this.passwordService = passwordService;
     }
 
     @Override
@@ -86,7 +89,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
 
         // Invalid password
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordService.matches(request.getPassword(), user.getPassword())) {
 
             loginAttemptService.recordFailure(
                     user.getUsername(),
@@ -106,3 +109,4 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         return user;
     }
 }
+

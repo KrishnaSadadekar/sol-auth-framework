@@ -15,6 +15,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Data;
+import lombok.experimental.SuperBuilder;
 
 @Data
 @MappedSuperclass
