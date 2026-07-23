@@ -15,7 +15,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Data;
-import lombok.experimental.SuperBuilder;
 
 @Data
 @MappedSuperclass
@@ -41,7 +40,5 @@ public abstract class BaseEntity {
 
   @Column(nullable = false)
   private Boolean deleted;
-
-
 
 }

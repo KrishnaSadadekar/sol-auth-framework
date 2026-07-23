@@ -1,0 +1,134 @@
+package sol.auth.service.service;
+
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import sol.auth.core.dto.LoginRequest;
+import sol.auth.core.dto.RegisterRequest;
+import sol.auth.core.entity.RefreshToken;
+import sol.auth.core.entity.User;
+import sol.auth.core.exception.InvalidCredentialsException;
+import sol.auth.core.repository.UserRepository;
+import sol.auth.core.service.AuthenticationService;
+import sol.auth.core.service.RegistrationService;
+import sol.auth.jwt.service.JwtTokenProvider;
+import sol.auth.jwt.service.RefreshTokenService;
+import sol.auth.service.dto.AuthResponse;
+import sol.auth.service.dto.AuthTokenResponse;
+import sol.auth.service.dto.UserSummaryResponse;
+
+@Service
+public class AuthApplicationService {
+
+    private final AuthenticationService authenticationService;
+    private final RegistrationService registrationService;
+    private final RefreshTokenService refreshTokenService;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
+
+    public AuthApplicationService(AuthenticationService authenticationService,
+            RegistrationService registrationService,
+            RefreshTokenService refreshTokenService,
+            JwtTokenProvider jwtTokenProvider,
+            UserRepository userRepository) {
+        this.authenticationService = authenticationService;
+        this.registrationService = registrationService;
+        this.refreshTokenService = refreshTokenService;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.userRepository = userRepository;
+    }
+
+    @Transactional
+    public AuthResponse login(LoginRequest request) {
+        User user = authenticationService.login(request);
+        return issueTokensForUser(user);
+    }
+
+    @Transactional
+    public AuthResponse register(RegisterRequest request) {
+        User user = registrationService.register(request);
+        return issueTokensForUser(user);
+    }
+
+    @Transactional
+    public AuthResponse refresh(String refreshToken) {
+        if (!refreshTokenService.isValid(refreshToken)) {
+            throw new InvalidCredentialsException("Invalid or expired refresh token");
+        }
+
+        RefreshToken existingToken = refreshTokenService.findByToken(refreshToken)
+                .orElseThrow(() -> new InvalidCredentialsException("Refresh token not found"));
+
+        User user = userRepository.findById(existingToken.getUserId())
+                .orElseThrow(() -> new InvalidCredentialsException("User not found for refresh token"));
+
+        refreshTokenService.revoke(refreshToken);
+        return issueTokensForUser(user);
+    }
+
+    @Transactional
+    public void logout(String refreshToken, Long userId) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            refreshTokenService.revoke(refreshToken);
+            return;
+        }
+
+        if (userId != null) {
+            refreshTokenService.revokeAllByUserId(userId);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<UserSummaryResponse> me(String authorizationHeader) {
+        if (authorizationHeader == null || authorizationHeader.isBlank()) {
+            return Optional.empty();
+        }
+
+        String token = extractBearerToken(authorizationHeader);
+        if (!jwtTokenProvider.validateAccessToken(token)) {
+            return Optional.empty();
+        }
+
+        Long userId = jwtTokenProvider.getUserId(token);
+        if (userId == null) {
+            return Optional.empty();
+        }
+
+        return userRepository.findById(userId).map(this::toUserSummary);
+    }
+
+    private AuthResponse issueTokensForUser(User user) {
+        String accessToken = jwtTokenProvider.generateAccessToken(user);
+        RefreshToken refreshToken = refreshTokenService.issueToken(user);
+
+        AuthTokenResponse tokenResponse = new AuthTokenResponse();
+        tokenResponse.setAccessToken(accessToken);
+        tokenResponse.setRefreshToken(refreshToken.getToken());
+        tokenResponse.setExpiresAt(jwtTokenProvider.getExpiration(accessToken));
+
+        AuthResponse response = new AuthResponse();
+        response.setToken(tokenResponse);
+        response.setUser(toUserSummary(user));
+        return response;
+    }
+
+    private UserSummaryResponse toUserSummary(User user) {
+        UserSummaryResponse response = new UserSummaryResponse();
+        response.setId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setEmail(user.getEmail());
+        response.setFirstName(user.getFirstName());
+        response.setLastName(user.getLastName());
+        return response;
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        String prefix = "Bearer ";
+        if (!authorizationHeader.startsWith(prefix)) {
+            throw new InvalidCredentialsException("Invalid Authorization header format");
+        }
+        return authorizationHeader.substring(prefix.length());
+    }
+}

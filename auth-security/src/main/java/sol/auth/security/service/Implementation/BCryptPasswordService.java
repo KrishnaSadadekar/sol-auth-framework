@@ -1,9 +1,11 @@
 package sol.auth.security.service.Implementation;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 
 import sol.auth.core.service.PasswordService;
 
+@Service
 public class BCryptPasswordService implements PasswordService {
 
     private final PasswordEncoder passwordEncoder;

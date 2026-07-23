@@ -1,11 +1,14 @@
 package sol.auth.core.service.implementation;
 
+import org.springframework.stereotype.Service;
+
 import sol.auth.core.entity.LoginAttempt;
 import sol.auth.core.entity.User;
 import sol.auth.core.enums.LoginStatus;
 import sol.auth.core.repository.LoginAttemptRepository;
 import sol.auth.core.service.LoginAttemptService;
 
+@Service
 public class LoginAttemptServiceImpl implements LoginAttemptService {
 
     private final LoginAttemptRepository loginAttemptRepository;
@@ -35,16 +38,16 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
                 .ipAddress(ipAddress)
                 .userAgent(userAgent)
                 .status(status)
-                  .build();
+                .build();
 
         loginAttemptRepository.save(loginAttempt);
     }
 
     @Override
     public long getFailedAttempts(String username) {
-         return loginAttemptRepository.countByUsernameAndStatus(
-            username,
-            LoginStatus.INVALID_PASSWORD);
+        return loginAttemptRepository.countByUsernameAndStatus(
+                username,
+                LoginStatus.INVALID_PASSWORD);
     }
 
 }

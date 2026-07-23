@@ -4,8 +4,6 @@ import java.util.List;
 import java.util.Optional;
 
 import sol.auth.core.entity.Role;
-import sol.auth.core.entity.User;
-import sol.auth.core.entity.UserRole;
 
 public interface RoleService {
 
@@ -21,5 +19,4 @@ public interface RoleService {
 
     List<Role> findAllRoles();
 
-   
 }

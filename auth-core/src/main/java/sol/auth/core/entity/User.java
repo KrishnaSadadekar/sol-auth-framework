@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.Builder.Default;
 import jakarta.persistence.Index;
 
 @Getter
@@ -39,28 +40,37 @@ public class User extends BaseEntity {
 
     private String profileImage;
 
+    @Default
     private Boolean emailVerified = false;
 
+    @Default
     private Boolean mobileVerified = false;
 
+    @Default
     private Boolean accountLocked = false;
 
     private LocalDateTime accountLockedAt;
 
+    @Default
     private Boolean accountExpired = false;
 
+    @Default
     private Boolean credentialsExpired = false;
+
+    @Default
+    private Boolean enabled = true;
+
+    @Default
+    private Integer failedLoginAttempts = 0;
 
     private LocalDateTime lastLogin;
 
     public void setEnabled(boolean b) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'setEnabled'");
+        this.enabled = b;
     }
 
     public void setFailedLoginAttempts(int i) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'setFailedLoginAttempts'");
+        this.failedLoginAttempts = i;
     }
 
 }

@@ -1,7 +1,5 @@
 package sol.auth.core.service.implementation;
 
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import sol.auth.core.dto.LoginRequest;
@@ -19,7 +17,7 @@ import sol.auth.core.service.PasswordService;
 public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final UserRepository userRepository;
-    
+
     private final PasswordService passwordService;
     private final LoginAttemptService loginAttemptService;
     private final AccountLockServiceImpl accountLockService;
@@ -48,7 +46,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     null,
                     null,
                     LoginStatus.USER_NOT_FOUND);
-            accountLockService.processFailedLogin(user);
             throw new InvalidCredentialsException("Invalid username or password");
         }
 
@@ -96,6 +93,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     null,
                     null,
                     LoginStatus.INVALID_PASSWORD);
+            accountLockService.processFailedLogin(user);
 
             throw new InvalidCredentialsException("Invalid username or password");
         }
@@ -109,4 +107,3 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         return user;
     }
 }
-

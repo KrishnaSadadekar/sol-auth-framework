@@ -2,8 +2,6 @@ package sol.auth.core.service.implementation;
 
 import java.util.Optional;
 
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import sol.auth.core.dto.RegisterRequest;
@@ -18,7 +16,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
 
     private final String USER_ALREADY_EXISTS_MESSAGE = "User with %s %s already exists";
-    
+
     private final PasswordService passwordService;
 
     UserServiceImpl(UserRepository userRepository, PasswordService passwordService) {
@@ -29,10 +27,12 @@ public class UserServiceImpl implements UserService {
     @Override
     public User register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new UserAlreadyExistsException(USER_ALREADY_EXISTS_MESSAGE.format("username", request.getUsername()));
+            throw new UserAlreadyExistsException(
+                    String.format(USER_ALREADY_EXISTS_MESSAGE, "username", request.getUsername()));
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new UserAlreadyExistsException(USER_ALREADY_EXISTS_MESSAGE.format("email", request.getEmail()));
+            throw new UserAlreadyExistsException(
+                    String.format(USER_ALREADY_EXISTS_MESSAGE, "email", request.getEmail()));
         }
 
         User user = new User();
@@ -64,8 +64,11 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Optional<User> findByLoginId(String loginId) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findByLoginId'");
+        Optional<User> byUsername = userRepository.findByUsername(loginId);
+        if (byUsername.isPresent()) {
+            return byUsername;
+        }
+        return userRepository.findByEmail(loginId);
     }
 
 }

@@ -1,5 +1,6 @@
 package sol.auth.core.service.implementation;
 
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import sol.auth.core.dto.RegisterRequest;
@@ -11,6 +12,7 @@ import sol.auth.core.service.RoleService;
 import sol.auth.core.service.UserRoleService;
 import sol.auth.core.service.UserService;
 
+@Service
 public class RegistrationServiceImpl implements RegistrationService {
 
     private final UserService userService;
@@ -36,8 +38,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         return user;
     }
 
-
-     private void validate(RegisterRequest request) {
+    private void validate(RegisterRequest request) {
         userService.findByUsername(request.getUsername()).ifPresent(u -> {
             throw new RuntimeException("Username already exists");
         });
@@ -47,7 +48,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     private User buildUser(RegisterRequest request) {
-         User user = User.builder()
+        User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(passwordService.encode(request.getPassword()))
@@ -55,28 +56,27 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .lastName(request.getLastName())
                 .mobileNumber(request.getMobileNumber())
                 .recoveryEmail(request.getRecoveryEmail())
-                               
+
                 .build();
 
-                 user.setActive(true);
-                 user.setEnabled(true);
-                 user.setDeleted(false);
-                 user.setEmailVerified(false);
-                 user.setMobileVerified(false);
-                 user.setAccountLocked(false);
-                 user.setAccountExpired(false);
-                 user.setCredentialsExpired(false);
-                 user.setFailedLoginAttempts(0);
-              
+        user.setActive(true);
+        user.setEnabled(true);
+        user.setDeleted(false);
+        user.setEmailVerified(false);
+        user.setMobileVerified(false);
+        user.setAccountLocked(false);
+        user.setAccountExpired(false);
+        user.setCredentialsExpired(false);
+        user.setFailedLoginAttempts(0);
+
         return user;
     }
 
     private void assignDefaultRole(User user) {
-       Role defaultRole = roleService
-            .findByName("ROLE_USER")
-            .orElseThrow(() ->
-                    new RuntimeException("Default role not found"));
-       userRoleService.assignRole(user, defaultRole);
+        Role defaultRole = roleService
+                .findByName("ROLE_USER")
+                .orElseThrow(() -> new RuntimeException("Default role not found"));
+        userRoleService.assignRole(user, defaultRole);
     }
 
 }

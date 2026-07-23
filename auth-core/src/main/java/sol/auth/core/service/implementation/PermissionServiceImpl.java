@@ -3,12 +3,15 @@ package sol.auth.core.service.implementation;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.stereotype.Service;
+
 import sol.auth.core.entity.Permission;
 import sol.auth.core.exception.PermissionAlreadyExistsException;
 import sol.auth.core.exception.PermissionNotFoundException;
 import sol.auth.core.repository.PermissionRepository;
 import sol.auth.core.service.PermissionService;
 
+@Service
 public class PermissionServiceImpl implements PermissionService {
 
     private final PermissionRepository permissionRepository;
