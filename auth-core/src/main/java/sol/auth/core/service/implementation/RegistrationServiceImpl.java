@@ -6,23 +6,31 @@ import org.springframework.transaction.annotation.Transactional;
 import sol.auth.core.dto.RegisterRequest;
 import sol.auth.core.entity.Role;
 import sol.auth.core.entity.User;
+import sol.auth.core.exception.UserAlreadyExistsException;
+import sol.auth.core.repository.UserRepository;
 import sol.auth.core.service.PasswordService;
 import sol.auth.core.service.RegistrationService;
 import sol.auth.core.service.RoleService;
 import sol.auth.core.service.UserRoleService;
 import sol.auth.core.service.UserService;
+import sol.auth.core.tenant.TenantContext;
 
 @Service
 public class RegistrationServiceImpl implements RegistrationService {
 
     private final UserService userService;
+    private final UserRepository userRepository;
     private final PasswordService passwordService;
     private final RoleService roleService;
     private final UserRoleService userRoleService;
 
-    public RegistrationServiceImpl(UserService userService, PasswordService passwordService, RoleService roleService,
+    public RegistrationServiceImpl(UserService userService,
+            UserRepository userRepository,
+            PasswordService passwordService,
+            RoleService roleService,
             UserRoleService userRoleService) {
         this.userService = userService;
+        this.userRepository = userRepository;
         this.passwordService = passwordService;
         this.roleService = roleService;
         this.userRoleService = userRoleService;
@@ -39,12 +47,22 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     private void validate(RegisterRequest request) {
-        userService.findByUsername(request.getUsername()).ifPresent(u -> {
-            throw new RuntimeException("Username already exists");
-        });
-        userService.findByEmail(request.getEmail()).ifPresent(u -> {
-            throw new RuntimeException("Email already exists");
-        });
+        Long tenantId = TenantContext.getTenantId();
+        if (tenantId != null) {
+            if (userRepository.existsByUsernameAndTenantId(request.getUsername(), tenantId)) {
+                throw new UserAlreadyExistsException("Username already exists in this tenant");
+            }
+            if (userRepository.existsByEmailAndTenantId(request.getEmail(), tenantId)) {
+                throw new UserAlreadyExistsException("Email already exists in this tenant");
+            }
+        } else {
+            userService.findByUsername(request.getUsername()).ifPresent(u -> {
+                throw new UserAlreadyExistsException("Username already exists");
+            });
+            userService.findByEmail(request.getEmail()).ifPresent(u -> {
+                throw new UserAlreadyExistsException("Email already exists");
+            });
+        }
     }
 
     private User buildUser(RegisterRequest request) {
@@ -68,6 +86,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         user.setAccountExpired(false);
         user.setCredentialsExpired(false);
         user.setFailedLoginAttempts(0);
+        user.setTenantId(TenantContext.getTenantId());
 
         return user;
     }

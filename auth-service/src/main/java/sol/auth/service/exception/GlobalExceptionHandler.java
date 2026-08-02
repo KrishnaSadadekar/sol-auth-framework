@@ -10,12 +10,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import sol.auth.core.exception.AccountLockedException;
 import sol.auth.core.exception.InvalidCredentialsException;
+import sol.auth.core.exception.TenantResolutionException;
 import sol.auth.core.exception.UserAlreadyExistsException;
 import sol.auth.core.exception.UserDisabledException;
 import sol.auth.service.dto.ErrorResponse;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(TenantResolutionException.class)
+    public ResponseEntity<ErrorResponse> handleTenantResolution(TenantResolutionException ex) {
+        return buildError(HttpStatus.BAD_REQUEST, "TENANT_NOT_FOUND", ex.getMessage());
+    }
 
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {

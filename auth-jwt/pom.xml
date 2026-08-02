@@ -16,7 +16,7 @@
     <dependencies>
         <dependency>
             <groupId>com.sol.auth</groupId>
-            <artifactId>auth-security</artifactId>
+            <artifactId>auth-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 

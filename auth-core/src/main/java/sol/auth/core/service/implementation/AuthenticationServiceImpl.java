@@ -12,6 +12,7 @@ import sol.auth.core.repository.UserRepository;
 import sol.auth.core.service.AuthenticationService;
 import sol.auth.core.service.LoginAttemptService;
 import sol.auth.core.service.PasswordService;
+import sol.auth.core.tenant.TenantContext;
 
 @Service
 public class AuthenticationServiceImpl implements AuthenticationService {
@@ -35,9 +36,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public User login(LoginRequest request) {
 
-        User user = userRepository
-                .findByUsername(request.getUsername())
-                .orElse(null);
+        Long tenantId = TenantContext.getTenantId();
+        User user = (tenantId != null)
+                ? userRepository.findByUsernameAndTenantId(request.getUsername(), tenantId).orElse(null)
+                : userRepository.findByUsername(request.getUsername()).orElse(null);
 
         // User not found
         if (user == null) {

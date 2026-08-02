@@ -41,4 +41,7 @@ public abstract class BaseEntity {
   @Column(nullable = false)
   private Boolean deleted;
 
+  @Column(name = "tenant_id")
+  private Long tenantId;
+
 }
