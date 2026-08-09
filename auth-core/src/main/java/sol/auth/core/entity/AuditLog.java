@@ -5,6 +5,9 @@ import java.time.LocalDateTime;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import sol.auth.common.enums.AuditAction;
 import lombok.AllArgsConstructor;
@@ -22,6 +25,8 @@ import lombok.Setter;
 @Table(name = "audit_logs")
 public class AuditLog extends BaseEntity {
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
     private User user;
 
     /**

@@ -26,9 +26,9 @@
         <module>auth-core</module>
         <module>auth-jwt</module>
         <module>auth-security</module>
+        <module>auth-service</module>
         <module>auth-autoconfigure</module>
         <module>auth-starter</module>
-        <module>auth-service</module>
         <module>auth-demo</module>
     </modules>
 

@@ -1,10 +1,12 @@
 package sol.auth.core.service.implementation;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import sol.auth.core.dto.LoginRequest;
 import sol.auth.core.entity.User;
 import sol.auth.core.enums.LoginStatus;
+import sol.auth.core.event.UserLoggedInEvent;
 import sol.auth.core.exception.AccountLockedException;
 import sol.auth.core.exception.InvalidCredentialsException;
 import sol.auth.core.exception.UserDisabledException;
@@ -22,16 +24,20 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final PasswordService passwordService;
     private final LoginAttemptService loginAttemptService;
     private final AccountLockServiceImpl accountLockService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AuthenticationServiceImpl(UserRepository userRepository,
             AccountLockServiceImpl accountLockService,
             LoginAttemptService loginAttemptService,
-            PasswordService passwordService) {
+            PasswordService passwordService,
+            ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.accountLockService = accountLockService;
         this.loginAttemptService = loginAttemptService;
         this.passwordService = passwordService;
+        this.eventPublisher = eventPublisher;
     }
+
 
     @Override
     public User login(LoginRequest request) {

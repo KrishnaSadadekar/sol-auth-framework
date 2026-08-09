@@ -1,11 +1,13 @@
 package sol.auth.core.service.implementation;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import sol.auth.core.dto.RegisterRequest;
 import sol.auth.core.entity.Role;
 import sol.auth.core.entity.User;
+import sol.auth.core.event.UserRegisteredEvent;
 import sol.auth.core.exception.UserAlreadyExistsException;
 import sol.auth.core.repository.UserRepository;
 import sol.auth.core.service.PasswordService;
@@ -23,17 +25,20 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final PasswordService passwordService;
     private final RoleService roleService;
     private final UserRoleService userRoleService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public RegistrationServiceImpl(UserService userService,
             UserRepository userRepository,
             PasswordService passwordService,
             RoleService roleService,
-            UserRoleService userRoleService) {
+            UserRoleService userRoleService,
+            ApplicationEventPublisher eventPublisher) {
         this.userService = userService;
         this.userRepository = userRepository;
         this.passwordService = passwordService;
         this.roleService = roleService;
         this.userRoleService = userRoleService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -43,6 +48,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         User user = buildUser(request);
         user = userService.create(user);
         assignDefaultRole(user);
+        eventPublisher.publishEvent(new UserRegisteredEvent(user, null, null));
         return user;
     }
 

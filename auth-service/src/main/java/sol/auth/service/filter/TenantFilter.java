@@ -2,6 +2,7 @@ package sol.auth.service.filter;
 
 import java.io.IOException;
 
+import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -20,6 +21,7 @@ import sol.auth.core.tenant.TenantContext;
 public class TenantFilter extends OncePerRequestFilter {
 
     static final String TENANT_HEADER = "X-Tenant-Id";
+    private static final String MDC_TENANT_KEY = "tenantId";
 
     private final TenantService tenantService;
 
@@ -38,6 +40,7 @@ public class TenantFilter extends OncePerRequestFilter {
             if (tenantCode != null && !tenantCode.isBlank()) {
                 Tenant tenant = tenantService.getByCode(tenantCode.trim());
                 TenantContext.setTenantId(tenant.getId());
+                MDC.put(MDC_TENANT_KEY, tenant.getTenantCode());
             }
             filterChain.doFilter(request, response);
         } catch (TenantResolutionException ex) {
@@ -48,6 +51,7 @@ public class TenantFilter extends OncePerRequestFilter {
                     "{\"code\":\"TENANT_NOT_FOUND\",\"message\":\"" + ex.getMessage() + "\"}");
         } finally {
             TenantContext.clear();
+            MDC.remove(MDC_TENANT_KEY);
         }
     }
 }
