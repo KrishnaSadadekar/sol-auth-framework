@@ -50,45 +50,68 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS roles (
-    id          BIGINT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name        VARCHAR(100)    NOT NULL UNIQUE,
-    description VARCHAR(500),
-    active      TINYINT(1)      NOT NULL DEFAULT 1,
-    deleted     TINYINT(1)      NOT NULL DEFAULT 0,
-    tenant_id   BIGINT,
-    created_at  DATETIME(6),
-    updated_at  DATETIME(6)     NOT NULL,
-    created_by  VARCHAR(100)    NOT NULL,
-    updated_by  VARCHAR(100)    NOT NULL
+    id              BIGINT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(100)    NOT NULL UNIQUE,
+    description     VARCHAR(500),
+    is_system_role  TINYINT(1)      NOT NULL DEFAULT 0,
+
+    active          TINYINT(1)      NOT NULL DEFAULT 1,
+    deleted         TINYINT(1)      NOT NULL DEFAULT 0,
+    tenant_id       BIGINT,
+
+    created_at      DATETIME(6),
+    updated_at      DATETIME(6)     NOT NULL,
+    created_by      VARCHAR(100)    NOT NULL,
+    updated_by      VARCHAR(100)    NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS permissions (
-    id          BIGINT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name        VARCHAR(100)    NOT NULL UNIQUE,
-    description VARCHAR(500),
-    active      TINYINT(1)      NOT NULL DEFAULT 1,
-    deleted     TINYINT(1)      NOT NULL DEFAULT 0,
-    tenant_id   BIGINT,
-    created_at  DATETIME(6),
-    updated_at  DATETIME(6)     NOT NULL,
-    created_by  VARCHAR(100)    NOT NULL,
-    updated_by  VARCHAR(100)    NOT NULL
+    id              BIGINT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    permission_code VARCHAR(100)    NOT NULL UNIQUE,
+    permission_name VARCHAR(100)    NOT NULL,
+    description     VARCHAR(500),
+    module          VARCHAR(100),
+
+    active          TINYINT(1)      NOT NULL DEFAULT 1,
+    deleted         TINYINT(1)      NOT NULL DEFAULT 0,
+    tenant_id       BIGINT,
+
+    created_at      DATETIME(6),
+    updated_at      DATETIME(6)     NOT NULL,
+    created_by      VARCHAR(100)    NOT NULL,
+    updated_by      VARCHAR(100)    NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS user_roles (
-    id          BIGINT  NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    user_id     BIGINT  NOT NULL,
-    role_id     BIGINT  NOT NULL,
-    active      TINYINT(1)      NOT NULL DEFAULT 1,
-    deleted     TINYINT(1)      NOT NULL DEFAULT 0,
-    tenant_id   BIGINT,
-    created_at  DATETIME(6),
-    updated_at  DATETIME(6)     NOT NULL,
-    created_by  VARCHAR(100)    NOT NULL,
-    updated_by  VARCHAR(100)    NOT NULL,
+    id              BIGINT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+
+    user_id         BIGINT          NOT NULL,
+    role_id         BIGINT          NOT NULL,
+
+    primary_role    TINYINT(1)      NOT NULL DEFAULT 0,
+    assigned_at     DATETIME(6),
+    expires_at      DATETIME(6),
+
+    active          TINYINT(1)      NOT NULL DEFAULT 1,
+    deleted         TINYINT(1)      NOT NULL DEFAULT 0,
+    tenant_id       BIGINT,
+
+    created_at      DATETIME(6),
+    updated_at      DATETIME(6)     NOT NULL,
+    created_by      VARCHAR(100)    NOT NULL,
+    updated_by      VARCHAR(100)    NOT NULL,
+
     UNIQUE KEY uq_user_role (user_id, role_id),
-    CONSTRAINT fk_ur_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-    CONSTRAINT fk_ur_role FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE
+
+    CONSTRAINT fk_ur_user
+        FOREIGN KEY (user_id)
+        REFERENCES users (id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_ur_role
+        FOREIGN KEY (role_id)
+        REFERENCES roles (id)
+        ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS role_permissions (
@@ -143,23 +166,34 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     CONSTRAINT fk_us_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS login_attempts (
-    id          BIGINT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    username    VARCHAR(100),
-    user_id     BIGINT,
-    ip_address  VARCHAR(50),
-    user_agent  VARCHAR(500),
-    status      VARCHAR(50)     NOT NULL,
-    attempted_at DATETIME(6),
-    active      TINYINT(1)      NOT NULL DEFAULT 1,
-    deleted     TINYINT(1)      NOT NULL DEFAULT 0,
-    tenant_id   BIGINT,
-    created_at  DATETIME(6),
-    updated_at  DATETIME(6)     NOT NULL,
-    created_by  VARCHAR(100)    NOT NULL,
-    updated_by  VARCHAR(100)    NOT NULL,
-    INDEX idx_la_username (username),
-    INDEX idx_la_user_id  (user_id)
+
+
+CREATE TABLE login_attempts (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+
+    user_id BIGINT NULL,
+
+    username VARCHAR(100),
+    ip_address VARCHAR(45),
+    user_agent VARCHAR(500),
+    login_time DATETIME,
+    status VARCHAR(50),
+
+    created_at DATETIME,
+    updated_at DATETIME,
+    created_by VARCHAR(255) NOT NULL,
+    updated_by VARCHAR(255) NOT NULL,
+
+    active BOOLEAN NOT NULL,
+    deleted BOOLEAN NOT NULL,
+
+    tenant_id BIGINT NULL,
+
+    PRIMARY KEY (id),
+
+    CONSTRAINT fk_login_attempt_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS password_history (

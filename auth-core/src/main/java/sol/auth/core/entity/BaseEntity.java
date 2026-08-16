@@ -20,28 +20,32 @@ import lombok.Data;
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 public abstract class BaseEntity {
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
+
   @CreatedDate
   private LocalDateTime createdAt;
-  @Column(nullable = false)
+
   @LastModifiedDate
+  @Column(nullable = false)
   private LocalDateTime updatedAt;
+
   @CreatedBy
   @Column(nullable = false)
   private String createdBy;
+
   @LastModifiedBy
   @Column(nullable = false)
   private String updatedBy;
 
   @Column(nullable = false)
-  private Boolean active;
+  private Boolean active = true;
 
   @Column(nullable = false)
-  private Boolean deleted;
+  private Boolean deleted = false;
 
   @Column(name = "tenant_id")
   private Long tenantId;
-
 }

@@ -1,1 +1,2 @@
 sol.auth.autoconfigure.AuthAutoConfiguration
+sol.auth.autoconfigure.AuthSecurityAutoConfiguration

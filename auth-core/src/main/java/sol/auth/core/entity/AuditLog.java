@@ -2,6 +2,7 @@ package sol.auth.core.entity;
 
 import java.time.LocalDateTime;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -16,47 +17,35 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+@Entity
+@Table(name = "audit_logs")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Entity
-@Table(name = "audit_logs")
 public class AuditLog extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    /**
-     * LOGIN, LOGOUT, PASSWORD_CHANGED, etc.
-     */
     @Enumerated(EnumType.STRING)
+    @Column(name = "action", nullable = false, length = 100)
     private AuditAction action;
 
-    /**
-     * Description of the action.
-     */
+    @Column(name = "description", length = 1000)
     private String description;
 
-    /**
-     * IP Address of the client.
-     */
+    @Column(name = "ip_address", length = 50)
     private String ipAddress;
 
-    /**
-     * Browser / Client information.
-     */
+    @Column(name = "user_agent", length = 500)
     private String userAgent;
 
-    /**
-     * SUCCESS / FAILED
-     */
+    @Column(name = "success")
     private Boolean success;
 
-    /**
-     * When the event occurred.
-     */
+    @Column(name = "action_time")
     private LocalDateTime actionTime;
 }

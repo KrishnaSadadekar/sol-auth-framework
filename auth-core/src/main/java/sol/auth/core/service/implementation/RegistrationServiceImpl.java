@@ -1,5 +1,7 @@
 package sol.auth.core.service.implementation;
 
+import java.time.LocalDateTime;
+
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +48,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     public User register(RegisterRequest request) {
         validate(request);
         User user = buildUser(request);
+        System.out.println("User Created " + user);
         user = userService.create(user);
         assignDefaultRole(user);
         eventPublisher.publishEvent(new UserRegisteredEvent(user, null, null));
@@ -93,7 +96,10 @@ public class RegistrationServiceImpl implements RegistrationService {
         user.setCredentialsExpired(false);
         user.setFailedLoginAttempts(0);
         user.setTenantId(TenantContext.getTenantId());
-
+        user.setCreatedAt(LocalDateTime.now());
+        user.setCreatedBy("CA");
+        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedBy("CA");
         return user;
     }
 

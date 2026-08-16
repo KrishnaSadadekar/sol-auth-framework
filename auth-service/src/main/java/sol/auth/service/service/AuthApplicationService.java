@@ -15,6 +15,7 @@ import sol.auth.core.service.AuthenticationService;
 import sol.auth.core.service.RegistrationService;
 import sol.auth.jwt.service.JwtTokenProvider;
 import sol.auth.jwt.service.RefreshTokenService;
+import sol.auth.security.principal.AuthUserPrincipal;
 import sol.auth.service.dto.AuthResponse;
 import sol.auth.service.dto.AuthTokenResponse;
 import sol.auth.service.dto.UserSummaryResponse;
@@ -81,22 +82,11 @@ public class AuthApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<UserSummaryResponse> me(String authorizationHeader) {
-        if (authorizationHeader == null || authorizationHeader.isBlank()) {
-            return Optional.empty();
-        }
+    public UserSummaryResponse me(AuthUserPrincipal principal) {
 
-        String token = extractBearerToken(authorizationHeader);
-        if (!jwtTokenProvider.validateAccessToken(token)) {
-            return Optional.empty();
-        }
+        User user = principal.getUser();
 
-        Long userId = jwtTokenProvider.getUserId(token);
-        if (userId == null) {
-            return Optional.empty();
-        }
-
-        return userRepository.findById(userId).map(this::toUserSummary);
+        return toUserSummary(user);
     }
 
     private AuthResponse issueTokensForUser(User user) {

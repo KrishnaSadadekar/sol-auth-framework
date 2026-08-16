@@ -35,6 +35,12 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-mysql</artifactId>
         </dependency>
+
+        <dependency>
+    <groupId>com.sol.auth</groupId>
+    <artifactId>auth-security</artifactId>
+    <version>${project.version}</version>
+</dependency>
     </dependencies>
 
 </project>

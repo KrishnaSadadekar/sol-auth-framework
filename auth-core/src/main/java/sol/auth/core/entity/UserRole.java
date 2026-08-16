@@ -2,6 +2,7 @@ package sol.auth.core.entity;
 
 import java.time.LocalDateTime;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -24,9 +25,12 @@ public class UserRole extends BaseEntity {
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
-    private Boolean primaryRole;
+    @Column(name = "primary_role", nullable = false)
+    private Boolean primaryRole = false;
 
+    @Column(name = "assigned_at")
     private LocalDateTime assignedAt;
 
+    @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 }

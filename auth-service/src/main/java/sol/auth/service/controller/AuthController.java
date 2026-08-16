@@ -6,7 +6,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,6 +17,8 @@ import sol.auth.service.dto.LogoutRequest;
 import sol.auth.service.dto.RefreshTokenRequest;
 import sol.auth.service.dto.UserSummaryResponse;
 import sol.auth.service.service.AuthApplicationService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import sol.auth.security.principal.AuthUserPrincipal;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -56,9 +57,13 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<UserSummaryResponse> me(
-            @RequestHeader(name = "Authorization", required = false) String authorization) {
-        return authApplicationService.me(authorization)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+            @AuthenticationPrincipal AuthUserPrincipal principal) {
+
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        return ResponseEntity.ok(
+                authApplicationService.me(principal));
     }
 }
