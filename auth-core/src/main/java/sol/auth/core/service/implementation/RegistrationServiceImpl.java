@@ -96,10 +96,6 @@ public class RegistrationServiceImpl implements RegistrationService {
         user.setCredentialsExpired(false);
         user.setFailedLoginAttempts(0);
         user.setTenantId(TenantContext.getTenantId());
-        user.setCreatedAt(LocalDateTime.now());
-        user.setCreatedBy("CA");
-        user.setUpdatedAt(LocalDateTime.now());
-        user.setUpdatedBy("CA");
         return user;
     }
 

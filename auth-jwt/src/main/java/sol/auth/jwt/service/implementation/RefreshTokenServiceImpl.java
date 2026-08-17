@@ -43,10 +43,6 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
         refreshToken.setActive(true);
         refreshToken.setDeleted(false);
-        refreshToken.setCreatedAt(LocalDateTime.now());
-        refreshToken.setCreatedBy("CA");
-        refreshToken.setUpdatedAt(LocalDateTime.now());
-        refreshToken.setUpdatedBy("CA");
         return refreshTokenRepository.save(refreshToken);
     }
 

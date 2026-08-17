@@ -38,11 +38,6 @@ public class UserRoleServiceImpl implements UserRoleService {
         userRole.setRole(role);
         userRole.setPrimaryRole(true);
         userRole.setAssignedAt(LocalDateTime.now());
-        userRole.setCreatedAt(LocalDateTime.now());
-        userRole.setCreatedBy("CA");
-        userRole.setUpdatedAt(LocalDateTime.now());
-        userRole.setUpdatedBy("CA");
-        System.out.println("User Role " + userRole);
         return userRoleRepository.save(userRole);
     }
 
