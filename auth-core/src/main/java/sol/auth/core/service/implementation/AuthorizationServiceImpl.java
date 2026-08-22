@@ -4,6 +4,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import sol.auth.core.entity.Permission;
 import sol.auth.core.entity.Role;
@@ -42,6 +43,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
         }
 
         @Override
+        @Transactional(readOnly = true)
         public Set<Role> getRoles(User user) {
 
                 return userRoleRepository.findByUser(user)

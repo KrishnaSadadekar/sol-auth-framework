@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
+import sol.auth.core.dto.ChangePasswordRequest;
 import sol.auth.core.dto.LoginRequest;
 import sol.auth.core.dto.RegisterRequest;
 import sol.auth.service.dto.AuthResponse;
@@ -66,4 +67,5 @@ public class AuthController {
         return ResponseEntity.ok(
                 authApplicationService.me(principal));
     }
+
 }

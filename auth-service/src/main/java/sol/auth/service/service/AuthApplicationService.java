@@ -1,10 +1,9 @@
 package sol.auth.service.service;
 
-import java.util.Optional;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import sol.auth.core.dto.ChangePasswordRequest;
 import sol.auth.core.dto.LoginRequest;
 import sol.auth.core.dto.RegisterRequest;
 import sol.auth.core.entity.RefreshToken;
@@ -12,6 +11,7 @@ import sol.auth.core.entity.User;
 import sol.auth.core.exception.InvalidCredentialsException;
 import sol.auth.core.repository.UserRepository;
 import sol.auth.core.service.AuthenticationService;
+import sol.auth.core.service.PasswordService;
 import sol.auth.core.service.RegistrationService;
 import sol.auth.jwt.service.JwtTokenProvider;
 import sol.auth.jwt.service.RefreshTokenService;
@@ -28,17 +28,19 @@ public class AuthApplicationService {
     private final RefreshTokenService refreshTokenService;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
+    private final PasswordService passwordService;
 
     public AuthApplicationService(AuthenticationService authenticationService,
             RegistrationService registrationService,
             RefreshTokenService refreshTokenService,
             JwtTokenProvider jwtTokenProvider,
-            UserRepository userRepository) {
+            UserRepository userRepository, PasswordService passwordService) {
         this.authenticationService = authenticationService;
         this.registrationService = registrationService;
         this.refreshTokenService = refreshTokenService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.userRepository = userRepository;
+        this.passwordService = passwordService;
     }
 
     @Transactional
@@ -114,11 +116,10 @@ public class AuthApplicationService {
         return response;
     }
 
-    private String extractBearerToken(String authorizationHeader) {
-        String prefix = "Bearer ";
-        if (!authorizationHeader.startsWith(prefix)) {
-            throw new InvalidCredentialsException("Invalid Authorization header format");
-        }
-        return authorizationHeader.substring(prefix.length());
+    public void changePassword(String username, ChangePasswordRequest request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new InvalidCredentialsException("USer not found"));
+        userRepository.save(passwordService.changePassword(user, request));
     }
+
 }

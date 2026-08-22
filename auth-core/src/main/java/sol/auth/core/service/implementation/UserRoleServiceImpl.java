@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import sol.auth.core.entity.Role;
 import sol.auth.core.entity.User;
 import sol.auth.core.entity.UserRole;
+import sol.auth.core.repository.RoleRepository;
 import sol.auth.core.repository.UserRoleRepository;
 import sol.auth.core.service.UserRoleService;
 
@@ -17,17 +18,18 @@ import sol.auth.core.service.UserRoleService;
 public class UserRoleServiceImpl implements UserRoleService {
 
     private final UserRoleRepository userRoleRepository;
+    private final RoleRepository roleRepository;
 
     @Override
     public void removeRole(Long userId, Long roleId) {
-        // TODO Auto-generated method stub
+
         throw new UnsupportedOperationException("Unimplemented method 'removeRole'");
     }
 
     @Override
     public List<Role> getRolesByUser(Long userId) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getRolesByUser'");
+
+        return roleRepository.findRolesByUserId(userId);
     }
 
     @Override

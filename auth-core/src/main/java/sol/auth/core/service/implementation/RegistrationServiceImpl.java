@@ -48,7 +48,6 @@ public class RegistrationServiceImpl implements RegistrationService {
     public User register(RegisterRequest request) {
         validate(request);
         User user = buildUser(request);
-        System.out.println("User Created " + user);
         user = userService.create(user);
         assignDefaultRole(user);
         eventPublisher.publishEvent(new UserRegisteredEvent(user, null, null));
