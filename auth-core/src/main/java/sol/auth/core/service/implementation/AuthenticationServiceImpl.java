@@ -3,6 +3,7 @@ package sol.auth.core.service.implementation;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import jakarta.servlet.http.HttpServletRequest;
 import sol.auth.core.dto.LoginRequest;
 import sol.auth.core.entity.User;
 import sol.auth.core.enums.LoginStatus;
@@ -24,20 +25,17 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final PasswordService passwordService;
     private final LoginAttemptService loginAttemptService;
     private final AccountLockServiceImpl accountLockService;
-    private final ApplicationEventPublisher eventPublisher;
 
     public AuthenticationServiceImpl(UserRepository userRepository,
             AccountLockServiceImpl accountLockService,
             LoginAttemptService loginAttemptService,
-            PasswordService passwordService,
-            ApplicationEventPublisher eventPublisher) {
+            PasswordService passwordService) {
         this.userRepository = userRepository;
         this.accountLockService = accountLockService;
         this.loginAttemptService = loginAttemptService;
         this.passwordService = passwordService;
-        this.eventPublisher = eventPublisher;
-    }
 
+    }
 
     @Override
     public User login(LoginRequest request) {

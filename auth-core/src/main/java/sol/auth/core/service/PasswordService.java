@@ -10,4 +10,5 @@ public interface PasswordService {
 
     User changePassword(User user, ChangePasswordRequest request);
 
+    void validatePassword(String password);
 }

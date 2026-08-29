@@ -12,6 +12,7 @@ import sol.auth.core.entity.AuditLog;
 import sol.auth.core.event.UserLockedEvent;
 import sol.auth.core.event.UserLoggedInEvent;
 import sol.auth.core.event.UserLoggedOutEvent;
+import sol.auth.core.event.UserPasswordChangedEvent;
 import sol.auth.core.event.UserRegisteredEvent;
 import sol.auth.core.repository.AuditLogRepository;
 import sol.auth.core.service.AuditLogService;
@@ -23,6 +24,7 @@ public class AuditLogServiceImpl implements AuditLogService {
 
     public AuditLogServiceImpl(AuditLogRepository auditLogRepository) {
         this.auditLogRepository = auditLogRepository;
+
     }
 
     @Async
@@ -94,4 +96,21 @@ public class AuditLogServiceImpl implements AuditLogService {
     public List<AuditLog> findByUserId(Long userId) {
         return auditLogRepository.findByUser_Id(userId);
     }
+
+    @Async
+    @EventListener
+    @Override
+    public void onPasswordChanged(UserPasswordChangedEvent event) {
+        AuditLog log = AuditLog.builder()
+                .user(event.user())
+                .action(AuditAction.PASSWORD_CHANGED)
+                .description("Password changed : " + event.user().getUsername())
+                .ipAddress(event.ipAddress())
+                .userAgent(event.userAgent())
+                .success(true)
+                .actionTime(LocalDateTime.now())
+                .build();
+        auditLogRepository.save(log);
+    }
+
 }

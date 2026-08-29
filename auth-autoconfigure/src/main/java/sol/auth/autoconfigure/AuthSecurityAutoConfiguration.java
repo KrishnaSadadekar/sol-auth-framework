@@ -3,6 +3,7 @@ package sol.auth.autoconfigure;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -35,8 +36,8 @@ public class AuthSecurityAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         public PasswordService passwordService(PasswordEncoder passwordEncoder,
-                        PasswordPolicyValidator passwordPolicyValidator) {
-                return new BCryptPasswordService(passwordEncoder, passwordPolicyValidator);
+                        PasswordPolicyValidator passwordPolicyValidator, ApplicationEventPublisher eventPublisher) {
+                return new BCryptPasswordService(passwordEncoder, passwordPolicyValidator, eventPublisher);
         }
 
 }

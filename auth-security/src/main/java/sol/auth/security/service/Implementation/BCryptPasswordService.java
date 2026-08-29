@@ -1,9 +1,11 @@
 package sol.auth.security.service.Implementation;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import sol.auth.core.dto.ChangePasswordRequest;
 import sol.auth.core.entity.User;
+import sol.auth.core.event.UserPasswordChangedEvent;
 import sol.auth.core.exception.InvalidCredentialsException;
 import sol.auth.core.service.PasswordService;
 import sol.auth.security.service.PasswordPolicyValidator;
@@ -15,10 +17,13 @@ public class BCryptPasswordService implements PasswordService {
 
     private final PasswordPolicyValidator passwordPolicyValidator;
 
+    private final ApplicationEventPublisher eventPublisher;
+
     public BCryptPasswordService(PasswordEncoder passwordEncoder,
-            PasswordPolicyValidator passwordPolicyValidator) {
+            PasswordPolicyValidator passwordPolicyValidator, ApplicationEventPublisher eventPublisher) {
         this.passwordPolicyValidator = passwordPolicyValidator;
         this.passwordEncoder = passwordEncoder;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -48,8 +53,7 @@ public class BCryptPasswordService implements PasswordService {
         }
 
         // 2. Validate new password policy
-        passwordPolicyValidator.validate(
-                request.getNewPassword());
+        validatePassword(request.getNewPassword());
 
         // 3. Make sure new password isn't current password
         if (passwordEncoder.matches(
@@ -63,8 +67,14 @@ public class BCryptPasswordService implements PasswordService {
         user.setPassword(
                 passwordEncoder.encode(
                         request.getNewPassword()));
+        eventPublisher.publishEvent(new UserPasswordChangedEvent(user, "", ""));
         return user;
 
+    }
+
+    @Override
+    public void validatePassword(String password) {
+        passwordPolicyValidator.validate(password);
     }
 
 }

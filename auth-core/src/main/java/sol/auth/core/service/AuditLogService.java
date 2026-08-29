@@ -4,6 +4,7 @@ import sol.auth.core.entity.AuditLog;
 import sol.auth.core.event.UserLockedEvent;
 import sol.auth.core.event.UserLoggedInEvent;
 import sol.auth.core.event.UserLoggedOutEvent;
+import sol.auth.core.event.UserPasswordChangedEvent;
 import sol.auth.core.event.UserRegisteredEvent;
 
 import java.util.List;
@@ -21,4 +22,6 @@ public interface AuditLogService {
     AuditLog save(AuditLog auditLog);
 
     List<AuditLog> findByUserId(Long userId);
+
+    void onPasswordChanged(UserPasswordChangedEvent event);
 }

@@ -1,18 +1,26 @@
 package sol.auth.service.service;
 
+import java.util.List;
+
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.servlet.http.HttpServletRequest;
 import sol.auth.core.dto.ChangePasswordRequest;
 import sol.auth.core.dto.LoginRequest;
 import sol.auth.core.dto.RegisterRequest;
+import sol.auth.core.entity.PasswordHistory;
 import sol.auth.core.entity.RefreshToken;
 import sol.auth.core.entity.User;
+import sol.auth.core.event.UserPasswordChangedEvent;
 import sol.auth.core.exception.InvalidCredentialsException;
-import sol.auth.core.repository.UserRepository;
+import sol.auth.core.exception.PasswordReuseException;
+import sol.auth.core.repository.PasswordHistoryRepository;
 import sol.auth.core.service.AuthenticationService;
 import sol.auth.core.service.PasswordService;
 import sol.auth.core.service.RegistrationService;
+import sol.auth.core.service.UserService;
 import sol.auth.jwt.service.JwtTokenProvider;
 import sol.auth.jwt.service.RefreshTokenService;
 import sol.auth.security.principal.AuthUserPrincipal;
@@ -27,20 +35,28 @@ public class AuthApplicationService {
     private final RegistrationService registrationService;
     private final RefreshTokenService refreshTokenService;
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final PasswordService passwordService;
+    private final PasswordHistoryRepository passwordHistoryRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final HttpServletRequest httpRequest;
 
     public AuthApplicationService(AuthenticationService authenticationService,
             RegistrationService registrationService,
             RefreshTokenService refreshTokenService,
             JwtTokenProvider jwtTokenProvider,
-            UserRepository userRepository, PasswordService passwordService) {
+            UserService userService, PasswordService passwordService,
+            PasswordHistoryRepository passwordHistoryRepository, ApplicationEventPublisher eventPublisher,
+            HttpServletRequest request) {
         this.authenticationService = authenticationService;
         this.registrationService = registrationService;
         this.refreshTokenService = refreshTokenService;
         this.jwtTokenProvider = jwtTokenProvider;
-        this.userRepository = userRepository;
+        this.userService = userService;
         this.passwordService = passwordService;
+        this.passwordHistoryRepository = passwordHistoryRepository;
+        this.eventPublisher = eventPublisher;
+        this.httpRequest = request;
     }
 
     @Transactional
@@ -64,8 +80,7 @@ public class AuthApplicationService {
         RefreshToken existingToken = refreshTokenService.findByToken(refreshToken)
                 .orElseThrow(() -> new InvalidCredentialsException("Refresh token not found"));
 
-        User user = userRepository.findById(existingToken.getUserId())
-                .orElseThrow(() -> new InvalidCredentialsException("User not found for refresh token"));
+        User user = userService.findById(existingToken.getUserId());
 
         refreshTokenService.revoke(refreshToken);
         return issueTokensForUser(user);
@@ -116,10 +131,77 @@ public class AuthApplicationService {
         return response;
     }
 
-    public void changePassword(String username, ChangePasswordRequest request) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new InvalidCredentialsException("USer not found"));
-        userRepository.save(passwordService.changePassword(user, request));
+    @Transactional
+    public void changePassword(
+            String username,
+            ChangePasswordRequest request) {
+
+        User user = userService.findByUsername(username)
+                .orElseThrow(() -> new InvalidCredentialsException("User not found"));
+
+        // 1. validate password history
+        validatePasswordHistory(user.getId(), request);
+
+        // 2. Validate current password + policy + generate new hash
+        User savedUser = passwordService.changePassword(user, request);
+        user.setPassword(savedUser.getPassword());
+
+        // 3. Save the new password hash into history
+        savePasswordHistory(user);
+
+        eventPublisher.publishEvent(new UserPasswordChangedEvent(savedUser, httpRequest.getRemoteAddr(),
+                httpRequest.getHeader("User-Agent")));
+
+    }
+
+    // Reset password
+    public void resetPassword(String username, ChangePasswordRequest request) {
+        User user = userService.findByUsername(username)
+                .orElseThrow(() -> new InvalidCredentialsException("User not found"));
+        passwordService.validatePassword(request.getCurrentPassword());
+        validatePasswordHistory(user.getId(), request);
+        savePasswordHistory(user);
+        eventPublisher.publishEvent(new UserPasswordChangedEvent(user, httpRequest.getRemoteAddr(),
+                httpRequest.getHeader("User-Agent")));
+
+    }
+
+    // Validate password history
+    private void validatePasswordHistory(Long id, ChangePasswordRequest request) {
+        // 1. Get password history
+        List<PasswordHistory> histories = passwordHistoryRepository
+                .findByUserIdOrderByCreatedAtDesc(id);
+
+        // 2. Check password reuse
+        boolean reused = histories.stream()
+                .anyMatch(history -> passwordService.matches(
+                        request.getNewPassword(),
+                        history.getPasswordHash()));
+
+        if (reused) {
+            throw new PasswordReuseException(
+                    "New password was previously used");
+        }
+    }
+
+    // Save the new password hash into history
+    private PasswordHistory savePasswordHistory(User user) {
+        PasswordHistory history = new PasswordHistory();
+        history.setUser(user);
+        history.setPasswordHash(user.getPassword());
+        return passwordHistoryRepository.save(history);
+
+    }
+
+    public AuthResponse resetPassword(String username) {
+        User user = userService.findByUsername(username)
+                .orElseThrow(() -> new InvalidCredentialsException("User not found"));
+
+        AuthResponse authResponse = issueTokensForUser(user);
+        authResponse.setResetEmailLink("reset password link ");
+
+        return authResponse;
+
     }
 
 }

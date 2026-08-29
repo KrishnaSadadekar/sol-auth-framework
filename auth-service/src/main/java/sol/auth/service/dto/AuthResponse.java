@@ -5,6 +5,8 @@ public class AuthResponse {
     private AuthTokenResponse token;
     private UserSummaryResponse user;
 
+    private String resetEmailLink;
+
     public AuthTokenResponse getToken() {
         return token;
     }
@@ -20,4 +22,13 @@ public class AuthResponse {
     public void setUser(UserSummaryResponse user) {
         this.user = user;
     }
+
+    public String getResetEmailLink() {
+        return resetEmailLink;
+    }
+
+    public void setResetEmailLink(String resetEmailLink) {
+        this.resetEmailLink = resetEmailLink;
+    }
+
 }

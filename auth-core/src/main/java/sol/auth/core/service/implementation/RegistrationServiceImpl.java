@@ -6,6 +6,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.servlet.http.HttpServletRequest;
 import sol.auth.core.dto.RegisterRequest;
 import sol.auth.core.entity.Role;
 import sol.auth.core.entity.User;

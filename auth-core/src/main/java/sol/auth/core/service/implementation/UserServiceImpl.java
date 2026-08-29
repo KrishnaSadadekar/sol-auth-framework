@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import sol.auth.core.dto.RegisterRequest;
 import sol.auth.core.entity.User;
+import sol.auth.core.exception.InvalidCredentialsException;
 import sol.auth.core.exception.UserAlreadyExistsException;
 import sol.auth.core.repository.UserRepository;
 import sol.auth.core.service.PasswordService;
@@ -69,6 +70,12 @@ public class UserServiceImpl implements UserService {
             return byUsername;
         }
         return userRepository.findByEmail(loginId);
+    }
+
+    @Override
+    public User findById(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new InvalidCredentialsException("User not found for refresh token"));
     }
 
 }
