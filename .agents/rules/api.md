@@ -1,85 +1,60 @@
-# REST API Design & Contract Standards
+# REST API Design & Service Contracts
 
-## Versioning & URI Structure
+## API Layout & Versioning
 
-1. **API Prefix**:
-   - All REST API endpoints must be explicitly versioned with the `/api/v1` prefix.
-   - Core API endpoints:
-     - `/api/v1/auth/login` (POST): Authenticate with username/password and receive tokens.
-     - `/api/v1/auth/register` (POST): Register a new user account.
-     - `/api/v1/auth/refresh` (POST): Exchange a valid refresh token for a new access/refresh pair.
-     - `/api/v1/auth/logout` (POST): Revoke active refresh tokens.
-     - `/api/v1/auth/me` (GET): Retrieve summary of currently authenticated user.
-     - `/api/v1/users` (GET, POST): User management endpoints.
-     - `/api/v1/passwords/*` (POST): Password reset and change endpoints.
-2. **HTTP Verb Semantics**:
-   - `POST`: Creation of resources or state transitions (login, register, refresh). Returns `201 Created` or `200 OK`.
-   - `GET`: Safe, idempotent read operations. Returns `200 OK`.
-   - `PUT` / `PATCH`: Full or partial resource updates. Returns `200 OK`.
-   - `DELETE`: Resource removal or soft-deletion. Returns `204 No Content`.
+All endpoints are versioned with the `/api/v1` prefix. The platform exposes three main categories of APIs:
+
+### 1. Authentication & SSO Endpoints (`/api/v1/auth`)
+- `POST /api/v1/auth/login`: Authenticate credentials, return access token + refresh token.
+- `POST /api/v1/auth/register`: Register new user (initiates welcome/verification email).
+- `POST /api/v1/auth/refresh`: Rotate refresh token and issue new token pair.
+- `POST /api/v1/auth/logout`: Invalidate refresh tokens.
+- `GET /api/v1/auth/me`: Return authenticated user profile and roles.
+- `GET /.well-known/jwks.json`: Public JSON Web Key Set for client Resource Servers to verify JWT signatures.
+
+### 2. User & Tenant Management (`/api/v1/users`, `/api/v1/tenants`)
+- `GET /api/v1/users`: List users (filtered by tenant).
+- `GET /api/v1/users/{id}`: Get user details by ID.
+- `PUT /api/v1/users/{id}/roles`: Assign/update user roles.
+- `POST /api/v1/tenants`: Create a new tenant.
+
+### 3. Centralized Communication Services (`/api/v1/communications`)
+Downstream microservices (LMS, ERP, HR) invoke these endpoints (or use `auth-client-starter` SDK) instead of maintaining their own SMTP or SMS providers:
+- `POST /api/v1/communications/email`: Send an email (supports templates, subject, recipient, attachments).
+- `POST /api/v1/communications/sms`: Send an SMS notification / OTP.
 
 ---
 
-## Strict DTO & Validation Conventions
+## Contract Standards & DTO Encapsulation
 
-1. **Entity Encapsulation**:
-   - **Never return or accept JPA entities in REST controllers**. Exposing entities causes data leaks (e.g. password hashes), lazy loading exceptions outside transaction boundaries, and serialization circularities.
-   - Always map entities to dedicated DTOs in `sol.auth.service.dto` (e.g., `UserSummaryResponse`, `AuthResponse`).
-2. **Input Validation**:
-   - Annotate controller classes with `@Validated` and request body parameters with `@Valid`.
-   - Use Jakarta validation annotations on DTOs:
-     ```java
-     public class RegisterRequest {
-         @NotBlank(message = "Username is required")
-         @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
-         private String username;
-
-         @NotBlank(message = "Email is required")
-         @Email(message = "Valid email is required")
-         private String email;
-
-         @NotBlank(message = "Password is required")
-         @Size(min = 8, message = "Password must be at least 8 characters")
-         private String password;
+1. **Zero Entity Exposure**:
+   - Controller endpoints must never expose JPA entities (`User`, `Role`, `Tenant`).
+   - Use dedicated DTOs (e.g., `LoginRequest`, `RegisterRequest`, `AuthResponse`, `UserSummaryResponse`, `EmailRequest`).
+2. **Standard Error Envelope**:
+   - All errors are formatted by `GlobalExceptionHandler`:
+     ```json
+     {
+       "code": "AUTH_INVALID_CREDENTIALS",
+       "message": "Invalid username or password",
+       "timestamp": "2026-09-25T11:45:00Z"
      }
      ```
+3. **HTTP Status Code Conventions**:
+   - `200 OK`: Successful read or token refresh.
+   - `201 Created`: Successful creation (register, tenant create).
+   - `204 No Content`: Successful logout or deletion.
+   - `400 Bad Request`: Validation failure or missing parameters.
+   - `401 Unauthorized`: Bad credentials or expired/invalid token.
+   - `403 Forbidden`: Insufficient role or disabled account.
+   - `404 Not Found`: Target user/tenant/resource does not exist.
+   - `409 Conflict`: Username or email already registered.
+   - `423 Locked`: Account locked due to failed attempts.
+   - `500 Internal Server Error`: Unhandled server exceptions.
 
 ---
 
-## Standardized Error Envelope
+## Headers & Tracing
 
-All API errors must be intercepted by `GlobalExceptionHandler` and return a consistent JSON payload:
-
-```json
-{
-  "code": "AUTH_INVALID_CREDENTIALS",
-  "message": "Invalid username or password",
-  "timestamp": "2026-09-25T11:30:00Z"
-}
-```
-
-### Standard Error Codes & Status Mappings
-
-| Exception | HTTP Status | Error Code |
-| :--- | :--- | :--- |
-| `TenantResolutionException` | 400 Bad Request | `TENANT_NOT_FOUND` |
-| `MethodArgumentNotValidException` | 400 Bad Request | `VALIDATION_ERROR` |
-| `IllegalArgumentException` | 400 Bad Request | `INVALID_REQUEST` |
-| `InvalidCredentialsException` | 401 Unauthorized | `AUTH_INVALID_CREDENTIALS` |
-| `UserDisabledException` | 403 Forbidden | `AUTH_USER_DISABLED` |
-| `RoleNotFoundException` / `UserNotFoundException` | 404 Not Found | `RESOURCE_NOT_FOUND` |
-| `UserAlreadyExistsException` | 409 Conflict | `AUTH_USER_EXISTS` |
-| `RoleAlreadyExistsException` | 409 Conflict | `ROLE_ALREADY_EXISTS` |
-| `AccountLockedException` | 423 Locked | `AUTH_ACCOUNT_LOCKED` |
-| Generic unhandled `Exception` | 500 Internal Server Error | `INTERNAL_ERROR` |
-
----
-
-## Header Conventions
-
-1. **`X-Tenant-Id`**:
-   - Required on tenant-scoped endpoints. Handled by `TenantFilter`.
-2. **`X-Correlation-Id`**:
-   - Optional incoming header. Handled by `CorrelationIdFilter`. If omitted, a UUID is generated and echoed back in the response header for distributed tracing.
-3. **`Authorization`**:
-   - Bearer token format: `Bearer <jwt-access-token>`.
+- `Authorization`: `Bearer <jwt-token>`
+- `X-Tenant-Id`: Tenant identifier for tenant-scoped operations.
+- `X-Correlation-Id`: Distributed trace ID propagated across services by `CorrelationIdFilter`.

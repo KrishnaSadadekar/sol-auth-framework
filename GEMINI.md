@@ -1,133 +1,130 @@
-# Auth Parent — Enterprise Reusable Authentication & User Management Platform
+# User Management & SSO Platform — Keycloak-Style Architecture
 
-## Project Overview
+## System Vision & Architectural Paradigm
 
-`auth-parent` is an enterprise-grade, multi-tenant authentication, authorization, and user management platform built with **Java 21** and **Spring Boot 3.5.x**. It is engineered with a dual distribution model:
-1. **Java Library / Spring Boot Starter (`auth-starter`)**: Other Spring Boot applications (such as `lms`) can include a single starter dependency to acquire complete auth, user management, and security capabilities with sensible defaults and auto-configuration.
-2. **REST API Façade (`auth-service`)**: Microservices and cross-language clients (Python, Node.js, React/Vue frontends) interact with authentication, authorization, and user management through standardized, versioned REST endpoints (`/api/v1/auth`, `/api/v1/users`, `/api/v1/passwords`).
+This project is an **Enterprise Centralized User Management, Identity & Access Management (IAM), and SSO Platform** (similar in role to Keycloak, Auth0, or Ory), built with **Java 21** and **Spring Boot 3.5.x**.
+
+It provides centralized, reusable platform services to avoid reimplementing them across multiple business microservices:
+1. **Centralized Authentication & Single Sign-On (SSO)**
+2. **Tenant-Aware User, Role & Permission Management**
+3. **Common Communication Services**: Email Service (SMTP, templates) & SMS Service
+4. **Audit Logging & Security Enforcement**
+
+```
+                       ┌──────────────────────────────────────────────┐
+                       │           User Management Platform           │
+                       │           (Auth Server / IdP / SSO)          │
+                       │                                              │
+                       │   - Authentication & SSO    - User & Roles   │
+                       │   - Email Service (SMTP)    - SMS Service    │
+                       │   - JWT / JWKS Token Issuer - Audit Engine   │
+                       └──────────────────────┬───────────────────────┘
+                                              │
+                                              │ Owns exclusively
+                                              ▼
+                                       ┌──────────────┐
+                                       │   auth-db    │
+                                       └──────────────┘
+                                              │
+                       Token Issuance / JWKS  │  REST / Client SDK
+                   ┌──────────────────────────┼──────────────────────────┐
+                   │                          │                          │
+                   ▼                          ▼                          ▼
+      ┌─────────────────────────┐┌─────────────────────────┐┌─────────────────────────┐
+      │           LMS           ││           ERP           ││           HR            │
+      │   (Resource Server)     ││   (Resource Server)     ││   (Resource Server)     │
+      │                         ││                         ││                         │
+      │ - Uses:                 ││ - Uses:                 ││ - Uses:                 │
+      │   auth-client-starter   ││   auth-client-starter   ││   auth-client-starter   │
+      │ - Verifies JWT locally  ││ - Verifies JWT locally  ││ - Verifies JWT locally  │
+      │ - ZERO auth-db access   ││ - ZERO auth-db access   ││ - ZERO auth-db access   │
+      └────────────┬────────────┘└────────────┬────────────┘└────────────┬────────────┘
+                   │                          │                          │
+                   ▼                          ▼                          ▼
+            ┌──────────────┐           ┌──────────────┐           ┌──────────────┐
+            │    lms-db    │           │    erp-db    │           │    hr-db     │
+            └──────────────┘           └──────────────┘           └──────────────┘
+```
 
 ---
 
-## Architecture & Modular Breakdown
+## The Golden Architectural Rules
 
-The project follows a clean, decoupled multi-module Maven structure with strict dependency hierarchy:
+### 1. Strict Database-per-Service (No Shared Database Anti-Pattern)
+- **`auth-db` belongs exclusively to the User Management Server**.
+- Consumer microservices (**LMS**, **ERP**, **HR**) connect **ONLY** to their own business databases (`lms-db`, `erp-db`, `hr-db`).
+- **LMS must NEVER connect to `auth-db`**. It must have NO datasource, NO Flyway migrations, and NO JPA entities for auth tables.
 
-```
-auth-common
-    │
-    ▼
-auth-core
-    │
-    ▼
-auth-security
-    │
-    ▼
-auth-jwt
-    │
-    ▼
-auth-service
-    │
-    ├───────────────────────┬────────────────────────┐
-    ▼                       ▼                        ▼
-auth-autoconfigure     auth-demo                    lms
-    │
-    ▼
-auth-starter
-```
+### 2. Single Sign-On (SSO) & Stateless Token Verification
+- The **User Management Server** acts as the Identity Provider (IdP):
+  - Authenticates users against `auth-db`.
+  - Issues digitally signed JWT access tokens (asymmetric RSA / JWKS or HMAC) and refresh tokens.
+  - Exposes `/.well-known/jwks.json` or public key endpoint for token validation.
+- Consumer microservices (**LMS**, **ERP**, **HR**) act as **OAuth2 / JWT Resource Servers**:
+  - They validate incoming `Bearer <token>` statelessly using the Auth Server's public key.
+  - Zero database hits to `auth-db` are needed to verify authentication or extract roles/tenant!
 
-### Module Responsibilities
+### 3. Client Starter vs. Server Components
+- **`auth-client-starter` (for LMS, ERP, HR)**:
+  - Lightweight Spring Boot starter included by consumer microservices.
+  - Configures Spring Security as a **Resource Server** (validates JWT, extracts `AuthUserPrincipal`, `tenantId`, `roles`, `permissions`).
+  - Provides `TenantFilter` / `TenantContext`.
+  - Provides a Client SDK (`UserManagementClient`) to call Auth Server APIs (e.g. `sendEmail`, `sendSms`, `getUserProfile`).
+  - **Contains ZERO JPA, ZERO DataSource, and ZERO entity mapping for auth tables.**
+- **`auth-server` / `auth-service`**:
+  - Standalone service running on its own port (e.g., 8080).
+  - Contains all JPA entities (`User`, `Role`, `Tenant`, `BaseEntity`), repositories, business services, and database migrations for `auth-db`.
 
-| Module | Purpose | Key Responsibilities & Components |
+### 4. Common Services (Email, SMS, Audit)
+- Common services are hosted centrally within the User Management platform.
+- Client applications consume them via:
+  - **REST API**: e.g., `POST /api/v1/communications/email`, `POST /api/v1/communications/sms`.
+  - **Client SDK**: Provided in `auth-client-starter` for one-line invocations: `notificationClient.sendEmail(request)`.
+  - **Event-Driven**: Async messaging via Kafka/RabbitMQ or Spring events.
+
+---
+
+## Module Breakdown
+
+| Module | Role | Dependencies & Scope |
 | :--- | :--- | :--- |
-| **`auth-common`** | Shared Domain Enums & Primitives | Base enums (`AuditAction`, `Gender`, `UserStatustus`), common utility constants. Zero dependencies on higher layers. |
-| **`auth-core`** | Core Domain & Business Logic | JPA entities (`BaseEntity`, `User`, `Role`, `Permission`, `Tenant`, `UserRole`, `RolePermission`, `LoginAttempt`, `PasswordHistory`, `RefreshToken`, `UserSession`), Spring Data repositories, core service interfaces & implementations (`UserService`, `RoleService`, `PermissionService`, `AuthenticationService`, `LoginAttemptService`, `AccountLockService`, `AuditLogService`, `RegistrationService`), domain events (`UserRegisteredEvent`, `UserLoggedInEvent`, `UserLockedEvent`), and `TenantContext`. |
-| **`auth-security`** | Spring Security Integration | Spring Security 6 configurations, stateless `JwtAuthenticationFilter`, `AuthUserPrincipal`, `CustomAuthenticationProvider`, `AuthUserDetailsService`, password policy enforcement (`PasswordPolicyValidator`, `BCryptPasswordService`), and `SpringSecurityAuditorAware`. |
-| **`auth-jwt`** | JWT & Refresh Token Lifecycle | `JwtTokenProvider` (HMAC/RSA token generation & claims parsing), `RefreshTokenService` (token rotation, persistence, and revocation), configuration properties (`JwtTokenProperties`). |
-| **`auth-service`** | REST API Façade | REST controllers (`AuthController`, `UserController`, `PasswordController`), request/response DTOs (`LoginRequest`, `RegisterRequest`, `AuthResponse`, `UserSummaryResponse`), unified `GlobalExceptionHandler`, request filters (`TenantFilter`, `CorrelationIdFilter`). |
-| **`auth-autoconfigure`** | Spring Boot Auto-Configuration | `@AutoConfiguration` classes (`AuthAutoConfiguration`, `AuthSecurityAutoConfiguration`), properties (`AuthPlatformProperties`), separate `authDataSource`, `authEntityManagerFactory`, and `authTransactionManager` beans for multi-datasource support. |
-| **`auth-starter`** | Unified Dependency Entrypoint | Transitive dependency aggregator packaging `auth-autoconfigure`, `auth-service`, `auth-security`, `auth-jwt`, and `auth-core` for plug-and-play client integration. |
-| **`auth-demo`** | Reference Implementation | Reference application showing standalone setup and configuration of the auth platform. |
-| **`lms`** | Consumer Application | Real-world consumer application (Learning Management System) demonstrating dual-datasource isolation (`lms_db` for business data, `auth_db` for auth data). |
+| **`auth-common`** | Shared Enums & Primitives | Enums (`AuditAction`, `Gender`, `UserStatustus`), common DTOs, and constants. Shared by both server and client. |
+| **`auth-core`** | Core Server Domain | JPA entities (`User`, `Role`, `Tenant`, `BaseEntity`), Spring Data repositories, core services (`UserService`, `RoleService`, `LoginAttemptService`, `AccountLockService`). Used **ONLY** by the Auth Server. |
+| **`auth-security`** | Security Foundations | Security 6 configurations, password policies (`BCryptPasswordService`), `AuthUserPrincipal`, authentication providers. |
+| **`auth-jwt`** | Token Issuance & Verification | `JwtTokenProvider`, key management (RSA / HMAC), refresh token persistence and rotation. |
+| **`auth-service`** | Server REST API & Controllers | Central REST controllers (`AuthController`, `UserController`, `NotificationController`), request/response DTOs, `GlobalExceptionHandler`. |
+| **`auth-client-starter`** | Client Resource Server Starter | Lightweight starter for **LMS, ERP, HR**. Automatically configures JWT verification, `TenantFilter`, and API client SDK. **NO database connection to `auth-db`!** |
+| **`auth-demo`** | Reference Auth Server | Standalone server demonstrating running the User Management / SSO service on `auth-db`. |
+| **`lms`** | Consumer Microservice | Learning Management System connecting **ONLY** to `lms-db`, using `auth-client-starter` for SSO and security. |
 
 ---
 
-## Agent Development Principles
+## Build & Execution Commands
 
-When developing code or making modifications in this repository, the agent MUST adhere to the following core guidelines:
+From the project root using Windows PowerShell (`mvnw.cmd`):
 
-### 1. Architectural Boundaries & Dependency Flow
-- **Never create circular dependencies**: Dependencies flow strictly downward: `common` -> `core` -> `security` -> `jwt` -> `service`.
-- **Entity & DTO Separation**: Never expose JPA entities (`User`, `Role`, `Tenant`, etc.) directly through REST controllers. Always map to/from dedicated DTOs in `auth-service/src/main/java/sol/auth/service/dto`.
-- **Statelessness**: No HTTP sessions are to be created for authentication. The security model is strictly stateless via bearer JWT tokens.
-
-### 2. Multi-Tenancy Architecture
-- All core entities inherit from `BaseEntity` which contains `tenantId`.
-- Every incoming HTTP request must resolve tenant context via `TenantFilter` (from the `X-Tenant-Id` header) and store it in `TenantContext`.
-- Always clear `TenantContext` in a `finally` block or filter completion to prevent ThreadLocal memory leakage.
-- Repository queries and authorization checks must be tenant-aware to guarantee strict tenant data isolation.
-
-### 3. Dual-Datasource & Persistence Isolation
-- In consumer applications like `lms`, business entities use the primary datasource, while auth entities live in the `authDataSource` configured in `AuthAutoConfiguration`.
-- Ensure repository interfaces in `sol.auth.core.repository` use `authTransactionManager` and the `authEntityManagerFactory`.
-- Schema migrations for the auth framework must remain decoupled from client application migrations.
-
-### 4. Auto-Configuration & Extensibility
-- Service beans exposed by the framework must use `@ConditionalOnMissingBean` where appropriate, allowing consuming applications to provide custom overrides (e.g. custom password hashing, custom user lookup, or custom audit sinks).
-- All configuration keys must be registered with `@ConfigurationProperties` and documented under the `auth.*` prefix.
-
-### 5. Error Handling & Contract Consistency
-- All exceptions thrown across services must be translated by `GlobalExceptionHandler` into a unified `ErrorResponse` envelope containing: `code`, `message`, `timestamp`, and optional validation details.
-- Avoid raw stack traces or leaked internal database exception messages to clients.
-
----
-
-## Build & Run Commands
-
-All commands should be executed from the project root using the provided Maven wrapper (`mvnw.cmd` on Windows PowerShell):
-
-### Build and Compile
 ```powershell
-# Clean and compile all modules
+# Compile all modules
 .\mvnw.cmd clean compile
 
-# Full build skipping tests
+# Build reactor skipping tests
 .\mvnw.cmd clean install -DskipTests
 
-# Build a specific module (e.g., auth-core)
-.\mvnw.cmd clean install -pl auth-core -am
-```
-
-### Run Tests
-```powershell
-# Run all tests across the reactor
-.\mvnw.cmd test
-
-# Run tests for a specific module
-.\mvnw.cmd test -pl auth-security
-
-# Run a single test class
-.\mvnw.cmd test -Dtest=SecurityConfigurationTest
-```
-
-### Run Consumer / Demo Applications
-```powershell
-# Run the LMS consumer application (port 8089)
-.\mvnw.cmd spring-boot:run -pl lms
-
-# Run the Auth Demo application
+# Run the central User Management Server (Demo / Auth Server)
 .\mvnw.cmd spring-boot:run -pl auth-demo
+
+# Run the LMS microservice (runs on port 8089 with lms-db only)
+.\mvnw.cmd spring-boot:run -pl lms
 ```
 
 ---
 
-## Rules Directory Reference
+## Modular Rules Reference
 
-Detailed, domain-specific rules are modularized under `.agents/rules/`:
-
-- [architecture.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/architecture.md): Module hierarchy, dependency direction, multi-tenancy, and auto-configuration design.
-- [java-spring.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/java-spring.md): Java 21 features, Spring Boot 3.5.x standards, Lombok practices, and Bean lifecycle.
-- [security.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/security.md): Spring Security 6, JWT lifecycle, password hashing, account lockout, and CORS/CSRF rules.
-- [database.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/database.md): JPA mapping, BaseEntity auditing, dual-datasource configuration, transactions, and Flyway.
-- [api.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/api.md): REST API design, `/api/v1` versioning, DTO mapping, error response envelope, and HTTP headers.
-- [testing.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/testing.md): Unit and integration testing standards, Mockito, slice tests, and tenant isolation tests.
-- [git.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/git.md): Commit conventions, branch strategy, PR quality gates, and security hygiene.
+- [architecture.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/architecture.md): Keycloak-style SSO, microservices boundaries, database-per-service pattern, client starter vs server separation.
+- [database.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/database.md): Strict database-per-service isolation; client apps never touch `auth-db`.
+- [security.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/security.md): SSO token lifecycle, asymmetric JWT validation, Resource Server setup, and password policy.
+- [api.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/api.md): REST contracts for Auth, SSO, User Management, and Communication (Email/SMS).
+- [java-spring.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/java-spring.md): Java 21, Spring Boot 3.5.x, constructor injection, and event handling.
+- [testing.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/testing.md): Resource Server tests, token validation tests, and tenant isolation tests.
+- [git.md](file:///d:/MyWork/Project/Workspace/Usermanagement/auth-parent/.agents/rules/git.md): Commit conventions, branch naming, and security hygiene.

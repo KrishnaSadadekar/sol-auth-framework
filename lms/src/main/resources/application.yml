@@ -1,8 +1,11 @@
+server:
+  port: 8089
+
 spring:
   application:
     name: lms
 
-  # Primary database for LMS business entities
+  # Primary and ONLY database for LMS business entities
   datasource:
     url: jdbc:mysql://localhost:3306/lms_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata
     username: root
@@ -11,38 +14,28 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update # or validate once lms migrations exist
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
     open-in-view: false
 
-  flyway:
-    enabled: true
-    locations: classpath:db/migration/lms # Keep LMS migrations separate
-
-server:
-  port: 8089
-
-
-
-  jwt:
+# Auth Platform Client Configuration (SSO & Resource Server)
+auth:
+  client:
+    server-url: http://localhost:8080
     secret: ${JWT_SECRET:my-local-development-secret-key-at-least-32-bytes}
     issuer: auth-demo
-    access-token-ttl-seconds: 900
-    refresh-token-ttl-seconds: 604800
-
-  security:
-    max-failed-login-attempts: 5
-    lockout-duration-minutes: 30
-
-  cors:
-    allowed-origins: "*"
+    permit-all:
+      - /public/**
+      - /swagger-ui/**
+      - /v3/api-docs/**
+      - /actuator/**
 
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{correlationId}] [%X{tenantId}] %-5level %logger{36} - %msg%n"
   level:
     sol.auth: INFO
+    com.sol.lms: DEBUG

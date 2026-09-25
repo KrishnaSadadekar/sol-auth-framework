@@ -29,6 +29,7 @@
         <module>auth-service</module>
         <module>auth-autoconfigure</module>
         <module>auth-starter</module>
+        <module>auth-client-starter</module>
         <module>auth-demo</module>
         <module>lms</module>
     </modules>

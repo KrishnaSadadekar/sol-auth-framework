@@ -1,83 +1,78 @@
-# Security & Authentication Standards
+# Security, SSO & Authentication Standards
 
-## Spring Security 6 Architecture
+## SSO & Token Verification Model
 
-1. **Stateless Filter Chain**:
-   - The security architecture is strictly stateless. Configure `SessionCreationPolicy.STATELESS` in `SecurityConfiguration`.
-   - Never create or rely on `HttpSession`.
-   - CSRF protection is disabled for stateless bearer-token REST endpoints:
+The security architecture operates on a **Single Sign-On (SSO) & OAuth2/JWT Resource Server** model:
+
+```
+[ Client Browser / Frontend ]
+          │
+          │ 1. Login (username/password)
+          ▼
+┌───────────────────────────────┐
+│ User Management / Auth Server │ ── Issues Signed JWT (Access + Refresh)
+└───────────────────────────────┘
+          │
+          │ 2. Request with Bearer JWT
+          ▼
+┌───────────────────────────────┐
+│     LMS / ERP / HR App        │ ── Statelessly validates JWT with Auth Server Public Key
+│      (Resource Server)        │    (ZERO database lookup!)
+└───────────────────────────────┘
+```
+
+---
+
+## 1. Auth Server Security (Identity Provider)
+
+1. **Authentication & Issuance**:
+   - Authenticates credentials against `auth-db`.
+   - Uses `BCryptPasswordEncoder` (strength 10+) for secure password storage.
+   - Enforces password strength rules via `PasswordPolicy` and prevents password reuse via `PasswordHistory`.
+   - Protects against brute-force attacks via `LoginAttemptService` and `AccountLockService`.
+2. **Token Signing & Keys**:
+   - **Asymmetric Signing (RSA)**: The Auth Server signs JWT tokens using a private RSA key.
+   - Exposes public keys via a standard JWKS endpoint (`/.well-known/jwks.json`) or shared public key property.
+   - Access Token Claims:
+     - `sub`: User ID or unique subject.
+     - `tenantId`: Tenant ID.
+     - `roles`: Assigned roles (`ROLE_USER`, `ROLE_ADMIN`, etc.).
+     - `permissions`: Fine-grained permission strings.
+     - `iss`, `iat`, `exp`: Token lifetime metadata (default access TTL: 15 minutes).
+3. **Refresh Tokens**:
+   - Stored in `auth-db` (`RefreshToken` entity).
+   - Invalidation & rotation upon exchange; revocation upon logout or password reset.
+
+---
+
+## 2. Consumer Applications Security (Resource Servers)
+
+1. **Stateless JWT Resource Server**:
+   - Consumer applications (LMS, ERP, HR) use `auth-client-starter`.
+   - Configures Spring Security 6 as a stateless OAuth2 / JWT Resource Server:
      ```java
      http.csrf(AbstractHttpConfigurer::disable)
          .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+         .authorizeHttpRequests(auth -> auth
+             .requestMatchers("/api/public/**", "/swagger-ui/**").permitAll()
+             .anyRequest().authenticated()
+         )
+         .oauth2ResourceServer(oauth2 -> oauth2.jwt(...));
      ```
-2. **Filter Placement**:
-   - `JwtAuthenticationFilter` must be positioned before `UsernamePasswordAuthenticationFilter`:
-     ```java
-     http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-     ```
-   - Unauthenticated public endpoints (e.g., `/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/refresh`, OpenAPI/Swagger endpoints) must be explicitly permitted with `.permitAll()`.
-   - All other application endpoints must require authentication with `.authenticated()`.
+2. **Local Token Verification**:
+   - Resource servers verify JWT tokens locally using the Auth Server's public key (or secret key / JWKS).
+   - **Zero connection to `auth-db` is required.**
+3. **Principal & Tenant Context**:
+   - A custom JWT authentication converter maps token claims into `AuthUserPrincipal`.
+   - `TenantFilter` extracts `tenantId` from the validated claims and sets it into `TenantContext` for the request lifecycle, clearing it in a `finally` block.
 
 ---
 
-## Token Lifecycle & JWT Policy
+## 3. Password Policies & Lockout Thresholds
 
-1. **Access Tokens**:
-   - Short-lived lifespan (default: 15 minutes / 900 seconds).
-   - Generated and validated by `JwtTokenProvider` using HMAC-SHA256 (or RSA-256 for asymmetric deployment).
-   - Mandatory claims in payload:
-     - `sub`: Subject identifier (user UUID or ID).
-     - `tenantId`: Active tenant identifier.
-     - `roles`: Assigned roles (e.g. `ROLE_ADMIN`, `ROLE_USER`).
-     - `permissions`: Assigned granular permissions.
-     - `iss`, `iat`, `exp`: Standard JWT claims.
-2. **Refresh Tokens**:
-   - Long-lived lifespan (default: 7 days / 604800 seconds).
-   - Persisted in the database via `RefreshToken` entity.
-   - Tied strictly to `userId` and `tenantId`.
-   - **Rotation Policy**: Every successful refresh token exchange must invalidate the old refresh token and issue a newly minted pair (access token + refresh token).
-   - **Revocation**: Upon `/logout` or password change, all active refresh tokens for the user must be revoked/invalidated immediately.
-
----
-
-## Password Management & Policies
-
-1. **Password Hashing**:
-   - Always use `BCryptPasswordEncoder` with a minimum strength of 10.
-   - Plaintext passwords must never touch the database or logs.
-2. **Password Validation**:
-   - Validate passwords against `PasswordPolicy` via `PasswordPolicyValidator` during registration and password reset.
-   - Enforce: minimum length (e.g. 8+ characters), combination of uppercase, lowercase, numbers, and special symbols.
-3. **Password History & Reuse**:
-   - Store hashed passwords in `PasswordHistory`.
-   - Forbid reusing any of the last *N* previous passwords (default: 3 to 5).
-
----
-
-## Account Lockout & Brute-Force Protection
-
-1. **Failed Attempt Tracking**:
-   - Record every authentication failure in `LoginAttempt` through `LoginAttemptService`.
-   - Trigger account locking via `AccountLockService` when failed attempts exceed `auth.security.max-failed-login-attempts` (default: 5).
-2. **Lockout Policy**:
-   - Lockout duration is defined by `auth.security.lockout-duration-minutes` (default: 30 minutes).
-   - If an account is locked, reject requests with `AccountLockedException` (translated to HTTP 423 Locked).
-   - Successful authentication must reset the consecutive failed login counter to 0.
-
----
-
-## Tenant Isolation in Security Context
-
-1. **Principal Enrichment**:
-   - `AuthUserPrincipal` implements `UserDetails` and holds both user credentials and `tenantId`.
-2. **Cross-Tenant Prevention**:
-   - `JwtAuthenticationFilter` must verify that the `tenantId` extracted from the JWT matches the `X-Tenant-Id` header (or initialize `TenantContext` using the token's claims).
-   - A valid JWT issued for Tenant A must never be accepted to authenticate actions or access resources in Tenant B.
-
----
-
-## Auditing & Security Context
-
-1. **`SpringSecurityAuditorAware`**:
-   - Implement `AuditorAware<String>` (or `AuditorAware<Long>`) to populate `createdBy` and `updatedBy` in `BaseEntity` from `SecurityContextHolder.getContext().getAuthentication()`.
-   - Handle unauthenticated contexts (e.g., registration or system migrations) gracefully with a fallback value (e.g., `"SYSTEM"` or `"ANONYMOUS"`).
+1. **Lockout Policy**:
+   - Default threshold: 5 consecutive failed login attempts (`auth.security.max-failed-login-attempts`).
+   - Default lockout duration: 30 minutes (`auth.security.lockout-duration-minutes`).
+   - Locked accounts respond with HTTP 423 (Locked).
+2. **Auditing**:
+   - `SpringSecurityAuditorAware` resolves the authenticated username/ID from `SecurityContextHolder` to populate `BaseEntity` audit timestamps.

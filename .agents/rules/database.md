@@ -1,70 +1,72 @@
 # Database & Persistence Guidelines
 
-## Dual-Datasource & Persistence Unit Isolation
+## Strict Database-Per-Service Architecture
 
-When integrating the auth framework into host applications (such as `lms`):
+In accordance with microservices best practices and the Keycloak-style architecture:
 
-1. **Datasource Separation**:
-   - Host applications configure their primary business datasource via standard `spring.datasource.*` (e.g., `lms_db`).
-   - The auth framework provides its own isolated datasource configured via `auth.datasource.*` (e.g., `auth_db`).
-2. **Explicit JPA Component Naming**:
-   - `authDataSource`: Dedicated `DataSource` bean for authentication and user management tables.
-   - `authEntityManagerFactory`: `LocalContainerEntityManagerFactoryBean` scanning `sol.auth.core.entity` with persistence unit name `"authPersistenceUnit"`.
-   - `authTransactionManager`: `PlatformTransactionManager` binding transactions to `authEntityManagerFactory`.
-3. **Repository Scanning**:
-   - Repositories in `sol.auth.core.repository` are enabled via:
-     ```java
-     @EnableJpaRepositories(
-         basePackages = "sol.auth.core.repository",
-         entityManagerFactoryRef = "authEntityManagerFactory",
-         transactionManagerRef = "authTransactionManager"
-     )
+```
+┌─────────────────────────────────┐
+│  User Management / Auth Server  │ ──────► auth-db (MySQL)
+└─────────────────────────────────┘
+┌─────────────────────────────────┐
+│               LMS               │ ──────► lms-db (MySQL / Postgres)
+└─────────────────────────────────┘
+┌─────────────────────────────────┐
+│               ERP               │ ──────► erp-db (MySQL / Postgres)
+└─────────────────────────────────┘
+┌─────────────────────────────────┐
+│               HR                │ ──────► hr-db (MySQL / Postgres)
+└─────────────────────────────────┘
+```
+
+### Absolute Isolation Rules
+1. **No Shared Database**:
+   - `auth-db` is strictly private to the User Management Server.
+   - Client applications (**LMS**, **ERP**, **HR**) **MUST NEVER connect to `auth-db`**.
+   - Client applications must **NOT** define an `authDataSource`, must not configure credentials for `auth-db`, and must not run Flyway migrations targeting `auth-db`.
+2. **Single Datasource in Consumer Applications**:
+   - LMS configures only its own business datasource via standard Spring Boot properties:
+     ```yaml
+     spring:
+       datasource:
+         url: jdbc:mysql://localhost:3306/lms_db
+         username: lms_user
+         password: lms_password
      ```
-   - Host applications must not mix their business repositories into the auth package scan.
+   - No dual-datasource complexity is allowed in client applications.
 
 ---
 
-## Entity Design & BaseEntity Conventions
+## Auth Server Persistence Design (`auth-db`)
 
-1. **Inheritance & Common Fields**:
-   - All domain entities in `auth-core` must extend `sol.auth.core.entity.BaseEntity`.
-   - Common fields inherited from `BaseEntity`:
-     - `id`: `Long`, generated via `GenerationType.IDENTITY`.
-     - `createdAt` / `updatedAt`: `LocalDateTime`, populated by `@CreatedDate` and `@LastModifiedDate`.
-     - `createdBy` / `updatedBy`: `String`, populated by `@CreatedBy` and `@LastModifiedBy`.
-     - `active`: `Boolean` (defaults to `true`).
-     - `deleted`: `Boolean` (defaults to `false`, supporting soft delete).
+The following rules apply to `auth-core` and the User Management Server:
+
+1. **Entity Design & BaseEntity**:
+   - All server domain entities (`User`, `Role`, `Permission`, `Tenant`, `UserRole`, `RolePermission`, `LoginAttempt`, `PasswordHistory`, `RefreshToken`, `UserSession`) extend `BaseEntity`.
+   - Inherited auditing and tenancy fields:
+     - `id`: `Long`, `GenerationType.IDENTITY`.
+     - `createdAt` / `updatedAt`: `LocalDateTime` audited automatically.
+     - `createdBy` / `updatedBy`: `String` audited via `SpringSecurityAuditorAware`.
+     - `active`: `Boolean` default `true`.
+     - `deleted`: `Boolean` default `false` (soft delete).
      - `tenantId`: `Long` (`@Column(name = "tenant_id")`).
 2. **Naming Conventions**:
-   - Tables and columns use lowercase `snake_case` (e.g., `login_attempts`, `refresh_tokens`, `role_permissions`).
-   - Avoid reserved SQL keywords in column definitions.
-3. **Relationships & Fetch Types**:
-   - **Always default to `FetchType.LAZY`** for `@ManyToOne`, `@OneToOne`, and `@OneToMany` relationships. Never use `FetchType.EAGER` unless strictly necessary and documented.
-   - Guard against N+1 query problems using `@EntityGraph` or `JOIN FETCH` JPQL queries in repository methods.
-
----
-
-## Repository & Query Guidelines
-
-1. **Tenant-Safe Queries**:
-   - Queries retrieving tenant-scoped entities must include `tenantId`:
-     ```java
-     Optional<User> findByUsernameAndTenantIdAndDeletedFalse(String username, Long tenantId);
-     boolean existsByEmailAndTenantIdAndDeletedFalse(String email, Long tenantId);
-     ```
-2. **Soft Delete Filtering**:
-   - Queries must respect `deleted = false` so soft-deleted records are not exposed to active business logic.
-3. **Transactions**:
-   - Annotate mutating service methods with `@Transactional(transactionManager = "authTransactionManager")`.
+   - Database tables and columns use `snake_case` (e.g., `refresh_tokens`, `login_attempts`, `tenant_id`).
+3. **Lazy Loading by Default**:
+   - Always specify `FetchType.LAZY` for `@ManyToOne`, `@OneToOne`, and `@OneToMany` relationships.
+   - Prevent N+1 problems using `@EntityGraph` or `JOIN FETCH` queries.
+4. **Transactions**:
+   - Annotate mutating service methods with `@Transactional`.
    - Annotate read-only query methods with `@Transactional(readOnly = true)`.
 
 ---
 
-## Schema Evolution & Migration (Flyway)
+## Flyway Migration Separation
 
-1. **Separation of Migrations**:
-   - Auth framework schema scripts must reside under `classpath:db/migration/auth`.
-   - Consuming applications (like `lms`) store their domain migrations under a distinct path (e.g., `classpath:db/migration/lms`).
-2. **Deterministic Versioning**:
-   - Name migration files with standard Flyway numbering: `V1__init_auth_schema.sql`, `V2__add_tenant_indexes.sql`.
-   - Never modify an already-executed migration script. Add a new migration version instead.
+1. **Auth Server Migrations**:
+   - Reside in `auth-service/src/main/resources/db/migration/auth` or the server application resources.
+   - Executed only by the User Management Server.
+2. **Client Service Migrations**:
+   - LMS migrations reside in `lms/src/main/resources/db/migration/lms`.
+   - Executed against `lms-db` during LMS application startup.
+   - The two migration histories (`flyway_schema_history`) are completely independent.
