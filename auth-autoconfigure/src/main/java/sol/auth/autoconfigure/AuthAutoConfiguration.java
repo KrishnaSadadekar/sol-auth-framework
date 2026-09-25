@@ -2,7 +2,10 @@ package sol.auth.autoconfigure;
 
 import javax.sql.DataSource;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -37,43 +40,38 @@ import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
         "sol.auth.security.service",
         "sol.auth.jwt.service.implementation",
         "sol.auth.service"
-
 })
 public class AuthAutoConfiguration {
 
     @Bean
+    @ConditionalOnProperty(prefix = "auth.datasource", name = "url")
     @ConfigurationProperties(prefix = "auth.datasource")
     public DataSourceProperties authDataSourceProperties() {
-        DataSourceProperties properties = new DataSourceProperties();
-        // Fallback default so LMS doesn't even need auth.datasource in its yml if
-        // defaults match
-        properties.setUrl(
-                "jdbc:mysql://localhost:3306/auth_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata");
-        properties.setUsername("root");
-        properties.setPassword("root");
-        properties.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        return properties;
+        return new DataSourceProperties();
     }
 
     @Bean(name = "authDataSource")
-    public DataSource authDataSource() {
-        return authDataSourceProperties().initializeDataSourceBuilder().build();
+    @ConditionalOnProperty(prefix = "auth.datasource", name = "url")
+    public DataSource authDataSource(@Qualifier("authDataSourceProperties") DataSourceProperties properties) {
+        return properties.initializeDataSourceBuilder().build();
     }
 
     @Bean(name = "authEntityManagerFactory")
+    @ConditionalOnProperty(prefix = "auth.datasource", name = "url")
     public LocalContainerEntityManagerFactoryBean authEntityManagerFactory(
-            EntityManagerFactoryBuilder builder) {
+            EntityManagerFactoryBuilder builder,
+            @Qualifier("authDataSource") DataSource authDataSource) {
         return builder
-                .dataSource(authDataSource())
-                .packages("sol.auth.entity") // Package where your auth entities live
+                .dataSource(authDataSource)
+                .packages("sol.auth.core.entity")
                 .persistenceUnit("authPersistenceUnit")
                 .build();
     }
 
     @Bean(name = "authTransactionManager")
+    @ConditionalOnProperty(prefix = "auth.datasource", name = "url")
     public PlatformTransactionManager authTransactionManager(
-            EntityManagerFactory authEntityManagerFactory) {
+            @Qualifier("authEntityManagerFactory") EntityManagerFactory authEntityManagerFactory) {
         return new JpaTransactionManager(authEntityManagerFactory);
     }
-
 }
