@@ -30,6 +30,7 @@
         <module>auth-autoconfigure</module>
         <module>auth-starter</module>
         <module>auth-demo</module>
+        <module>lms</module>
     </modules>
 
     <dependencyManagement>
