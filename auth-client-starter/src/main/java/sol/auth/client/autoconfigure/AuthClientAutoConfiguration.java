@@ -62,24 +62,53 @@ public class AuthClientAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(org.springframework.web.cors.CorsConfigurationSource.class)
+    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
+        org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
+        configuration.setAllowedOriginPatterns(java.util.List.of("*"));
+        configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(java.util.List.of("Authorization", "Content-Type", "X-Tenant-Id", "X-Campus-Code", "X-School", "X-User"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
+        org.springframework.web.cors.UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
     @ConditionalOnMissingBean(SecurityFilterChain.class)
     public SecurityFilterChain resourceServerSecurityFilterChain(
             HttpSecurity http,
             AuthClientProperties properties,
             JwtAuthenticationFilter jwtAuthenticationFilter,
-            TenantFilter tenantFilter) throws Exception {
+            TenantFilter tenantFilter,
+            org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource) throws Exception {
 
         String[] permitAllPatterns = properties.getPermitAll().toArray(new String[0]);
 
         http
                 .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authEx) -> {
+                            response.setContentType("application/json");
+                            response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().write("{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
+                        })
+                        .accessDeniedHandler((request, response, accessEx) -> {
+                            response.setContentType("application/json");
+                            response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                            response.getWriter().write("{\"status\":403,\"error\":\"Forbidden\",\"message\":\"Access denied\"}");
+                        })
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(permitAllPatterns).permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterAfter(jwtAuthenticationFilter, TenantFilter.class);
 
         return http.build();
     }

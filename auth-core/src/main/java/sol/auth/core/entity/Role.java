@@ -23,6 +23,6 @@ public class Role extends BaseEntity {
     @Column(name = "description", length = 500)
     private String description;
 
-    @Column(name = "is_system_role", nullable = false)
-    private Boolean isSystemRole = false;
+    // @Column(name = "is_system_role", nullable = false)
+    // private Boolean isSystemRole = false;
 }

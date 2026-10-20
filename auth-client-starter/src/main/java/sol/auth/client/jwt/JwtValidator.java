@@ -40,12 +40,21 @@ public class JwtValidator {
 
             String username = claims.getSubject();
             Long userId = extractLong(claims, "uid");
+            if (userId == null) {
+                userId = extractLong(claims, "userId");
+            }
             Long tenantId = extractLong(claims, "tid");
             if (tenantId == null) {
                 tenantId = extractLong(claims, "tenantId");
             }
 
             List<String> roles = extractStringList(claims, "roles");
+            if (roles.isEmpty()) {
+                Object singleRole = claims.get("role");
+                if (singleRole != null) {
+                    roles = new ArrayList<>(List.of(singleRole.toString()));
+                }
+            }
             List<String> permissions = extractStringList(claims, "permissions");
 
             AuthUserPrincipal principal = AuthUserPrincipal.builder()

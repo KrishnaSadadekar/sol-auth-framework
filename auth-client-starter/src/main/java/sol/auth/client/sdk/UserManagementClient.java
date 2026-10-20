@@ -16,6 +16,7 @@ import sol.auth.client.tenant.TenantContext;
 import sol.auth.common.dto.CommunicationResponse;
 import sol.auth.common.dto.EmailRequest;
 import sol.auth.common.dto.SmsRequest;
+import sol.auth.common.dto.UserSummaryResponse;
 
 public class UserManagementClient {
 
@@ -41,6 +42,37 @@ public class UserManagementClient {
     public CommunicationResponse sendSms(SmsRequest request) {
         String url = properties.getServerUrl() + "/api/v1/communications/sms";
         return postJson(url, request, CommunicationResponse.class);
+    }
+
+    public UserSummaryResponse getUserProfile(Long userId) {
+        String url = properties.getServerUrl() + "/api/v1/users/" + userId;
+        return getJson(url, UserSummaryResponse.class);
+    }
+
+    private <T> T getJson(String url, Class<T> responseType) {
+        try {
+            HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Accept", "application/json")
+                    .timeout(Duration.ofSeconds(10))
+                    .GET();
+
+            if (TenantContext.hasTenant()) {
+                reqBuilder.header("X-Tenant-Id", String.valueOf(TenantContext.getTenantId()));
+            }
+
+            HttpResponse<String> response = httpClient.send(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                return objectMapper.readValue(response.body(), responseType);
+            } else {
+                log.warn("UserManagement GET call failed with status: {}, body: {}", response.statusCode(), response.body());
+                return null;
+            }
+        } catch (Exception ex) {
+            log.error("Failed to execute GET request to UserManagement server: {}", ex.getMessage());
+            return null;
+        }
     }
 
     private <T> T postJson(String url, Object payload, Class<T> responseType) {

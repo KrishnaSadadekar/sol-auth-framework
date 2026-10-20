@@ -1,6 +1,6 @@
 package sol.auth.service.dto;
 
-public class UserSummaryResponse {
+public class UserSummaryResponse extends sol.auth.common.dto.UserSummaryResponse {
 
     private Long id;
     private String username;
