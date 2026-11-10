@@ -67,7 +67,8 @@ public class AuthClientAutoConfiguration {
         org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
         configuration.setAllowedOriginPatterns(java.util.List.of("*"));
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(java.util.List.of("Authorization", "Content-Type", "X-Tenant-Id", "X-Campus-Code", "X-School", "X-User"));
+        configuration.setAllowedHeaders(java.util.List.of("Authorization", "Content-Type", "X-Tenant-Id",
+                "X-Campus-Code", "X-School", "X-User"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
@@ -86,6 +87,7 @@ public class AuthClientAutoConfiguration {
             org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource) throws Exception {
 
         String[] permitAllPatterns = properties.getPermitAll().toArray(new String[0]);
+        System.out.println("Permit allow " + permitAllPatterns.toString());
 
         http
                 .csrf(csrf -> csrf.disable())
@@ -95,18 +97,18 @@ public class AuthClientAutoConfiguration {
                         .authenticationEntryPoint((request, response, authEx) -> {
                             response.setContentType("application/json");
                             response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
-                            response.getWriter().write("{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
+                            response.getWriter().write(
+                                    "{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
                         })
                         .accessDeniedHandler((request, response, accessEx) -> {
                             response.setContentType("application/json");
                             response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
-                            response.getWriter().write("{\"status\":403,\"error\":\"Forbidden\",\"message\":\"Access denied\"}");
-                        })
-                )
+                            response.getWriter()
+                                    .write("{\"status\":403,\"error\":\"Forbidden\",\"message\":\"Access denied\"}");
+                        }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(permitAllPatterns).permitAll()
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(jwtAuthenticationFilter, TenantFilter.class);
 
